@@ -1,6 +1,7 @@
 import * as http from 'http';
 import { Mozart } from '../core/mozart';
 import { MozartRequest, BudgetMode, PrivacyMode } from '../types';
+import { dashboardHtml } from './dashboard';
 
 export interface ApiServerOptions {
   port?: number;
@@ -75,6 +76,8 @@ export class MozartApiServer {
       // Route matching
       if (method === 'GET' && url === '/health') {
         this.handleHealth(res);
+      } else if (method === 'GET' && (url === '/' || url === '/dashboard')) {
+        this.handleDashboard(res);
       } else if (method === 'GET' && url === '/v1/inventory') {
         this.handleInventory(res);
       } else if (method === 'POST' && url === '/v1/route') {
@@ -106,6 +109,12 @@ export class MozartApiServer {
       version: '0.1.0',
       uptime: process.uptime(),
     }));
+  }
+
+  private handleDashboard(res: http.ServerResponse): void {
+    const html = dashboardHtml(this.mozart);
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
   }
 
   private handleInventory(res: http.ServerResponse): void {

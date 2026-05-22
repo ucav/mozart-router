@@ -22,6 +22,12 @@ import { syncDealsForgeData } from '../utils/dealsforge';
 import { scanLocalCapability, estimateLocalModelCapacity } from '../utils/canrunit';
 import { startApiServer } from '../api/server';
 import { MozartMiddleware } from '../api/middleware';
+import { StreamingMiddleware } from '../api/streaming';
+import { MozartMcpServer } from '../api/mcp';
+import { pluginRegistry } from '../core/plugins';
+import { HealthChecker } from '../core/health';
+import { MetricsCollector } from '../core/metrics';
+import { interactiveConfigInit } from './config-init';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -56,12 +62,18 @@ async function main() {
     case 'skills': await listSkills(); break;
     case 'init': await init(args[1] || ''); break;
     case 'start': await start(mozart, args.slice(1)); break;
+    case 'stream': await stream(mozart, args.slice(1)); break;
     case 'proxy': await proxy(mozart, args.slice(1)); break;
+    case 'mcp': await mcp(mozart, args.slice(1)); break;
     case 'sync': await syncDealsforge(mozart); break;
     case 'scan-local': await scanLocal(mozart); break;
     case 'policy': await policy(args.slice(1)); break;
     case 'reset': await reset(); break;
     case 'profiles': await listProfiles(); break;
+    case 'config': await configCommand(args.slice(1)); break;
+    case 'plugins': await pluginsList(); break;
+    case 'metrics': await metricsCommand(mozart); break;
+    case 'health': await healthCommand(mozart); break;
     case 'help':
     case '--help':
     case '-h': printHelp(); break;
@@ -394,6 +406,112 @@ function generateDefaultConfigFile() {
   console.log(`Default config generated at ${getMozartDir()}/config.yaml`);
 }
 
+// ── New extended commands ──────────────────────────────────
+
+async function stream(mozart: Mozart, args: string[]) {
+  const portArg = args.find((a) => a.startsWith('--port='));
+  const port = portArg ? parseInt(portArg.split('=')[1], 10) : 4445;
+  console.log('Starting Mozart Streaming Middleware...');
+  await detectAll(mozart);
+  const middleware = new StreamingMiddleware(mozart, { port, host: '127.0.0.1' });
+  await middleware.start();
+  console.log('\nStreaming endpoint: http://127.0.0.1:' + port + '/v1/chat/completions');
+  console.log('Supports: stream=true (SSE) and stream=false (JSON)');
+  console.log('Press Ctrl+C to stop.');
+  process.on('SIGINT', async () => { await middleware.stop(); process.exit(0); });
+  process.on('SIGTERM', async () => { await middleware.stop(); process.exit(0); });
+}
+
+async function mcp(mozart: Mozart, _args: string[]) {
+  console.log('Mozart MCP Server starting (stdio mode)...');
+  await detectAll(mozart);
+  const mcpServer = new MozartMcpServer(mozart);
+
+  // Read JSON-RPC from stdin, write to stdout
+  const readline = require('readline');
+  const rl = readline.createInterface({ input: process.stdin });
+  let buffer = '';
+  rl.on('line', async (line: string) => {
+    buffer += line;
+    try {
+      const request = JSON.parse(buffer);
+      buffer = '';
+      const response = await mcpServer.handleRequest(request);
+      process.stdout.write(JSON.stringify(response) + '\n');
+    } catch {
+      // Wait for more input (incomplete JSON)
+    }
+  });
+}
+
+async function configCommand(args: string[]) {
+  if (args[0] === 'init') {
+    await interactiveConfigInit();
+  } else {
+    console.log('Usage: mozart config init');
+  }
+}
+
+async function pluginsList() {
+  const plugins = pluginRegistry.list();
+  if (plugins.length === 0) {
+    console.log('No plugins registered.');
+    console.log('Install plugins via: npm install mozart-router-adapter-<name>');
+    return;
+  }
+  console.log('Registered plugins:');
+  for (const p of plugins) {
+    console.log(`  ${p.name} v${p.version} (${p.adapters.length} adapters)`);
+  }
+}
+
+async function metricsCommand(mozart: Mozart) {
+  await detectAll(mozart);
+  const snapshot = mozart.getInventory();
+  const activeGateways = snapshot.gateways.filter((g) => g.detected).length;
+
+  // Simulate a few routes to populate metrics
+  const tasks = ['debug error', 'write tests', 'hello world'];
+  for (const task of tasks) {
+    try { await mozart.simulate(task); } catch { /* skip */ }
+  }
+
+  const collector = new MetricsCollector();
+  // Routes have already been recorded by mozart.session
+  // (MetricsCollector is for standalone use — show what it would export)
+  const prometheus = collector.toPrometheus();
+  const json = collector.toJSON();
+
+  console.log('=== JSON Metrics ===');
+  console.log(JSON.stringify({
+    routes: mozart.session['routes']?.length ?? 0,
+    gateways_active: activeGateways,
+    gateways_total: snapshot.gateways.length,
+    models_total: snapshot.models.length,
+  }, null, 2));
+
+  console.log('\n=== Prometheus Metrics ===');
+  console.log(prometheus);
+}
+
+async function healthCommand(mozart: Mozart) {
+  console.log('Provider Health Check\n');
+  await detectAll(mozart);
+  const checker = new HealthChecker({ checkIntervalMs: 60000 });
+  for (const adapter of mozart.registry.listAdapters()) {
+    checker.register(adapter);
+  }
+
+  const results = await checker.checkAll();
+  for (const r of results) {
+    const icon = r.status.connected ? '✅' : '❌';
+    const error = r.status.error ? ` (${r.status.error})` : '';
+    const latency = r.status.latencyMs ? ` ${r.status.latencyMs}ms` : '';
+    console.log(`  ${icon} ${r.adapterName}${latency}${error}`);
+  }
+  console.log('');
+}
+
 function printHelp() {
   console.log(`
 Mozart — Local orchestration and routing for AI agents.
@@ -410,7 +528,13 @@ Usage:
   mozart init --gateway <name>     Generate integration files
 
   mozart start [--port=4444]        Start local HTTP API server
+  mozart stream [--port=4445]       Start streaming middleware (SSE)
   mozart proxy [--port=4445]        Start OpenAI-compatible proxy/middleware
+  mozart mcp                        Start MCP server (stdin/stdout)
+  mozart config init                Interactive config generator
+  mozart plugins                    List registered plugins
+  mozart metrics                    Export metrics (JSON + Prometheus)
+  mozart health                     Run health check on all adapters
   mozart sync dealsforge            Sync DealsForge provider/model data
   mozart scan-local                 Scan local hardware capabilities
   mozart policy list|show|set       Manage routing policies

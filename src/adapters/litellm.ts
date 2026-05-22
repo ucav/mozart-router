@@ -13,6 +13,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+let YAML: { parse: (str: string) => unknown } | null = null;
+try {
+  YAML = require('yaml');
+} catch {
+  // yaml package not available, fall back to simple parsing
+}
+
 export class LiteLLMAdapter implements GatewayAdapter {
   id = 'litellm';
   name = 'LiteLLM';
@@ -47,23 +54,26 @@ export class LiteLLMAdapter implements GatewayAdapter {
       details.push('No LiteLLM config file found in common locations');
     }
 
-    const active = foundConfig;
-    // Try to parse providers from config
     let providersCount = 0;
     let modelsCount = 0;
 
     if (foundConfig && configPath) {
       try {
         const content = fs.readFileSync(configPath, 'utf-8');
-        // Simple YAML parsing for known LiteLLM structures
-        const providerMatches = content.match(/model_name:|litellm_params:|model:/g);
-        if (providerMatches) {
-          providersCount = 1;
-          modelsCount = providerMatches.length;
-          details.push(`Approximately ${modelsCount} model entries detected`);
+        const parsed = this.parseConfig(content);
+        const models = this.extractModels(parsed);
+        const providers = new Set(models.map((m: string) => m.split('/')[0]));
+        providersCount = providers.size;
+        modelsCount = models.length;
+        details.push(`${providersCount} provider(s), ${modelsCount} model(s)`);
+        for (const m of models.slice(0, 10)) {
+          details.push(`  - ${m}`);
         }
-      } catch {
-        details.push('Could not parse config file');
+        if (models.length > 10) {
+          details.push(`  ... and ${models.length - 10} more`);
+        }
+      } catch (err) {
+        details.push(`Could not parse config: ${err}`);
       }
     }
 
@@ -73,38 +83,63 @@ export class LiteLLMAdapter implements GatewayAdapter {
       gatewayName: this.name,
       configPath,
       configFormat: 'yaml',
-      status: active ? 'active' : 'not_found',
+      status: foundConfig ? 'active' : 'not_found',
       providersCount,
       modelsCount,
       details,
     };
   }
 
-  async readConfig(): Promise<GatewayConfigSummary> {
-    const providers: string[] = [];
-    const models: string[] = [];
+  private parseConfig(content: string): Record<string, unknown> {
+    if (YAML) {
+      return YAML.parse(content) as Record<string, unknown>;
+    }
+    // Fallback: simple line-by-line parsing
+    const lines = content.split('\n');
+    const result: Record<string, unknown> = {};
+    const modelList: Array<{ model_name?: string; litellm_params?: { model?: string } }> = [];
+    for (const line of lines) {
+      const modelMatch = line.match(/^\s*-\s*model_name:\s*["']?([^"'\s#]+)/);
+      if (modelMatch) {
+        modelList.push({ model_name: modelMatch[1] });
+      }
+      const litellmMatch = line.match(/^\s*model:\s*["']?([^"'\s#]+)/);
+      if (litellmMatch && modelList.length > 0) {
+        const last = modelList[modelList.length - 1];
+        if (!last.litellm_params) last.litellm_params = {};
+        last.litellm_params.model = litellmMatch[1];
+      }
+    }
+    result.model_list = modelList;
+    return result;
+  }
 
+  private extractModels(config: Record<string, unknown>): string[] {
+    const models: string[] = [];
+    const modelList = config.model_list as Array<Record<string, unknown>> | undefined;
+    if (modelList) {
+      for (const entry of modelList) {
+        const modelName = (entry.model_name as string) || (entry.litellm_params as Record<string, unknown>)?.model as string;
+        if (modelName) models.push(modelName);
+      }
+    }
+    return models;
+  }
+
+  async readConfig(): Promise<GatewayConfigSummary> {
+    const models: string[] = [];
     for (const p of this.configPaths()) {
       if (fs.existsSync(p)) {
         try {
-          const content = fs.readFileSync(p, 'utf-8');
-          const lines = content.split('\n');
-          for (const line of lines) {
-            const modelMatch = line.match(/model_name:\s*["']?([^"'\s#]+)/);
-            if (modelMatch) {
-              models.push(modelMatch[1]);
-            }
-          }
-        } catch {
-          // continue
-        }
+          const parsed = this.parseConfig(fs.readFileSync(p, 'utf-8'));
+          models.push(...this.extractModels(parsed));
+        } catch { /* skip */ }
       }
     }
-
     return {
       gatewayId: this.id,
       gatewayName: this.name,
-      providers,
+      providers: [],
       models,
       capabilities: ['multi-provider', 'proxy', 'openai-compatible'],
     };
@@ -112,14 +147,12 @@ export class LiteLLMAdapter implements GatewayAdapter {
 
   async listProviders(): Promise<Provider[]> {
     const summary = await this.readConfig();
-
     if (summary.models.length > 0) {
       const uniqueProviders = new Set<string>();
       for (const m of summary.models) {
         const parts = m.split('/');
         if (parts.length >= 1) uniqueProviders.add(parts[0]);
       }
-
       return Array.from(uniqueProviders).map((name) => ({
         id: `litellm-${name}`,
         name,
@@ -133,7 +166,6 @@ export class LiteLLMAdapter implements GatewayAdapter {
         lastCheckedAt: new Date().toISOString(),
       }));
     }
-
     return [
       {
         id: 'litellm-default',

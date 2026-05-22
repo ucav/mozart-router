@@ -1,0 +1,27 @@
+# docker-compose for Mozart
+# Start: docker compose up
+# API at http://localhost:4444
+# Proxy at http://localhost:4445 (uncomment below)
+
+services:
+  mozart:
+    build: .
+    ports:
+      - "4444:4444"
+    volumes:
+      - mozart-data:/root/.mozart
+    command: start --port=4444
+    restart: unless-stopped
+
+  # Uncomment to run the OpenAI-compatible proxy alongside:
+  # mozart-proxy:
+  #   build: .
+  #   ports:
+  #     - "4445:4445"
+  #   volumes:
+  #     - mozart-data:/root/.mozart
+  #   command: proxy --port=4445
+  #   restart: unless-stopped
+
+volumes:
+  mozart-data:

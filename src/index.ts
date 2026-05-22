@@ -5,11 +5,25 @@ export { Mozart } from './core/mozart';
 export type { MozartConfig } from './core/mozart';
 export { InventoryRegistry } from './core/inventory';
 export { SessionTracker } from './core/session';
+export { ResultCache } from './core/cache';
+export type { CacheEntry } from './core/cache';
+export { PluginRegistry, pluginRegistry } from './core/plugins';
+export type { MozartPlugin } from './core/plugins';
+export { HealthChecker } from './core/health';
+export type { HealthCheckResult } from './core/health';
+export { MetricsCollector } from './core/metrics';
+export type { MetricsSnapshot } from './core/metrics';
 
 export { TaskClassifier } from './routing/classifier';
 export { RoutingEngine } from './routing/router';
 export type { PolicyEvalResult } from './routing/router';
 export { RoutingScorer } from './routing/scorer';
+export { FallbackManager } from './routing/fallback';
+export type { FallbackEvent, FallbackResult } from './routing/fallback';
+export { MultiStageRouter } from './routing/multistage';
+export type { MultiStageStep, MultiStageResult } from './routing/multistage';
+export { CircuitBreaker, CircuitBreakerError } from './routing/circuit-breaker';
+export type { CircuitState, CircuitBreakerConfig } from './routing/circuit-breaker';
 
 export { PolicyEngine } from './policy/engine';
 export { loadPolicyFromEnv } from './policy/loader';
@@ -28,50 +42,32 @@ export type { LogEntry } from './logs/logger';
 export { Redactor } from './logs/redactor';
 
 export {
-  OllamaAdapter,
-  LiteLLMAdapter,
-  OpenRouterAdapter,
-  OpenCodeAdapter,
-  OpenClawAdapter,
-  HermesAdapter,
-  CursorAdapter,
-  LMStudioAdapter,
-  VllmAdapter,
-  NvidiaNimAdapter,
-  GenericOpenAIAdapter,
-  discoverAllGenericAdapters,
+  OllamaAdapter, LiteLLMAdapter, OpenRouterAdapter,
+  OpenCodeAdapter, OpenClawAdapter, HermesAdapter, CursorAdapter,
+  LMStudioAdapter, VllmAdapter, NvidiaNimAdapter,
+  GenericOpenAIAdapter, discoverAllGenericAdapters,
 } from './adapters';
 export type { GenericAdapterConfig } from './adapters';
 
 export {
-  ALL_SKILLS,
-  ROUTE_MODEL_SKILL,
-  EXPLAIN_ROUTE_SKILL,
-  ESTIMATE_COST_SKILL,
-  COMPRESS_CONTEXT_SKILL,
-  PRIVACY_CHECK_SKILL,
-  FALLBACK_PLAN_SKILL,
-  INVENTORY_SKILL,
+  ALL_SKILLS, ROUTE_MODEL_SKILL, EXPLAIN_ROUTE_SKILL,
+  ESTIMATE_COST_SKILL, COMPRESS_CONTEXT_SKILL,
+  PRIVACY_CHECK_SKILL, FALLBACK_PLAN_SKILL, INVENTORY_SKILL,
 } from './skills';
 
 export { MozartApiServer, startApiServer } from './api/server';
 export type { ApiServerOptions } from './api/server';
 export { MozartMiddleware } from './api/middleware';
 export type { MiddlewareOptions } from './api/middleware';
-
-export { ResultCache } from './core/cache';
-export type { CacheEntry } from './core/cache';
-
-export { FallbackManager } from './routing/fallback';
-export type { FallbackEvent, FallbackResult } from './routing/fallback';
-export { MultiStageRouter } from './routing/multistage';
-export type { MultiStageStep, MultiStageResult } from './routing/multistage';
+export { StreamingMiddleware } from './api/streaming';
+export type { StreamingMiddlewareOptions } from './api/streaming';
+export { MozartMcpServer } from './api/mcp';
+export type { McpToolDefinition, McpRequest, McpResponse } from './api/mcp';
+export { dashboardHtml } from './api/dashboard';
 
 export {
-  saveInventory, loadInventory,
-  saveSession, loadSession,
-  saveConfig, loadConfigYaml,
-  getMozartDir, clearAllData,
+  saveInventory, loadInventory, saveSession, loadSession,
+  saveConfig, loadConfigYaml, getMozartDir, clearAllData,
 } from './core/persistence';
 
 export { syncDealsForgeData } from './utils/dealsforge';
