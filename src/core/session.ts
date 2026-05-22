@@ -39,11 +39,13 @@ export class SessionTracker {
         this.routes.reduce((sum, r) => {
           if (r.fallbacks.length > 0) {
             const premiumCost = r.fallbacks[0]?.estimatedCost ?? r.estimatedCost * 2;
-            return sum + ((premiumCost - r.estimatedCost) / premiumCost) * 100;
+            if (premiumCost > 0) {
+              return sum + ((premiumCost - r.estimatedCost) / premiumCost) * 100;
+            }
           }
-          return sum + 40; // default estimate 40% savings vs premium
+          return sum + (r.estimatedCost === 0 ? 100 : 40); // 100% savings for free local, 40% default
         }, 0) / this.routes.length;
-      savingsPercent = Math.round(avgSavings);
+      savingsPercent = isNaN(avgSavings) ? 0 : Math.round(avgSavings);
     }
 
     const lines = [

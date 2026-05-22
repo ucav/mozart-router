@@ -24,27 +24,35 @@ Detect it, understand it, orchestrate it.
 ## Quick start
 
 ```bash
-# Install locally
-npm install mozart-router
+# Clone and install
+git clone https://github.com/ucav/mozart-router.git
+cd mozart-router
+npm install
+npm run build
 
 # Detect your stack
-npx mozart-router doctor
+npm run mozart -- doctor
 
 # Simulate a task
-npx mozart-router simulate "debug my Next.js build error"
+npm run mozart -- simulate "debug my Next.js build error"
 
 # Route a task
-npx mozart-router route "write Playwright tests"
+npm run mozart -- route "write Playwright tests"
 
 # Explain last decision
-npx mozart-router why
+npm run mozart -- why
 
 # Session report
-npx mozart-router report
+npm run mozart -- report
 
 # List available skills
-npx mozart-router skills
+npm run mozart -- skills
 ```
+
+Once published to npm:
+```bash
+npm install mozart-router
+npx mozart-router doctor
 
 ## Integration modes
 
@@ -66,16 +74,26 @@ npx mozart-router init --gateway hermes
 ### 2. As an SDK (in your agent code)
 
 ```typescript
-import { Mozart } from 'mozart-router';
+import { Mozart, OllamaAdapter, OpenRouterAdapter } from 'mozart-router';
 
 const mozart = new Mozart();
 
-// Detect gateways and build inventory
-const detection = await mozart.detectAll();
+// Register adapters — Mozart auto-detects each gateway
+mozart.registry.registerAdapter(new OllamaAdapter());
+mozart.registry.registerAdapter(new OpenRouterAdapter());
+
+for (const adapter of mozart.registry.listAdapters()) {
+  const detection = await adapter.detect();
+  if (detection.detected) {
+    const providers = await adapter.listProviders();
+    const models = await adapter.listModels();
+    mozart.registry.mergeFromAdapter(adapter.id, providers, models);
+  }
+}
 
 // Route a task
 const route = await mozart.recommend('write a function to sort an array');
-console.log(route.selectedModel);  // "deepseek/deepseek-chat"
+console.log(route.selectedModel);  // "qwen3:8b"
 
 // Full processing with privacy, cost, explanation
 const response = await mozart.process({
@@ -84,6 +102,8 @@ const response = await mozart.process({
   privacyMode: 'balanced',
   executionMode: 'recommend',
 });
+
+console.log(response.explanation);
 ```
 
 ### 3. As an adapter
@@ -156,6 +176,12 @@ Existing Gateway            → executes the call
 | `mozart why` | Explain the last routing decision |
 | `mozart report` | Show session report |
 | `mozart skills` | List available Mozart skills |
+| `mozart profiles` | List built-in policy profiles |
+| `mozart start [--port=4444]` | Start local HTTP API |
+| `mozart proxy [--port=4445]` | Start OpenAI-compatible middleware |
+| `mozart policy list` | List available policy profiles |
+| `mozart scan-local` | Scan local hardware capabilities |
+| `mozart sync dealsforge` | Load DealsForge provider intelligence |
 | `mozart init --gateway <name>` | Generate integration files |
 
 ## Skills

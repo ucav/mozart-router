@@ -22,15 +22,23 @@ Mozart can function in pure advisory mode, generating recommendations without ex
 ## Supported integrations
 
 ### OpenCode
-**Status:** Adapter stub + manifest available
+**Status:** Real detection + skill manifest available
+
+Mozart detects:
+- OpenCode installation via environment variables (OPENCODE_CLIENT, OPENCODE_SERVER_USERNAME)
+- OpenCode data directory
 
 Mozart provides:
 - `examples/opencode/mozart-skill.json` — skill manifest
-- Config detection for OpenCode provider configurations
-- Routing recommendations for coding tasks
+- Routing recommendations for coding tasks via the SDK
 
 ### OpenClaw
-**Status:** Adapter stub + manifest available
+**Status:** Real detection — reads openclaw.json config
+
+Mozart detects:
+- OpenClaw config at `~/.openclaw/openclaw.json`
+- All configured providers and models
+- Gateway mode and port
 
 Mozart provides:
 - `examples/openclaw/mozart-skill.yaml` — skill definition

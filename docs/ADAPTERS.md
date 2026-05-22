@@ -42,21 +42,46 @@ interface GatewayAdapter {
 - **Execution:** Recommends models, delegates execution
 - **Inventory:** Curated list of popular models with pricing
 
-## Stub adapters
-
-These adapters are structured and ready for integration but require the actual environment:
-
 ### OpenCodeAdapter
 - **ID:** `opencode`
-- **Status:** Stub with manifest
+- **Status:** Real detection
+- **Detection:** Checks for OpenCode installation via environment variables (OPENCODE_CLIENT, OPENCODE_SERVER_USERNAME) and data directory
 - **Integration path:** `examples/opencode/mozart-skill.json`
-- **Next steps:** Read OpenCode config file, detect configured providers
 
 ### OpenClawAdapter
 - **ID:** `openclaw`
-- **Status:** Stub with manifest
+- **Status:** Real detection — reads openclaw.json
+- **Detection:** Parses `~/.openclaw/openclaw.json`, extracts all providers, models, gateway settings
 - **Integration path:** `examples/openclaw/mozart-skill.yaml`
-- **Next steps:** Connect to OpenClaw skill system
+
+### LMStudioAdapter
+- **ID:** `lmstudio`
+- **Status:** Real — HTTP detection
+- **Detection:** Queries `http://localhost:1234/v1/models`
+- **Execution:** Direct HTTP to LM Studio's OpenAI-compatible endpoint
+
+### VllmAdapter
+- **ID:** `vllm`
+- **Status:** Real — HTTP detection
+- **Detection:** Queries `http://localhost:8000/v1/models`
+- **Execution:** Direct HTTP to vLLM's OpenAI-compatible endpoint
+
+### NvidiaNimAdapter
+- **ID:** `nim`
+- **Status:** Real — HTTP + env detection
+- **Detection:** Queries local NIM endpoint + checks NVIDIA_API_KEY
+- **Inventory:** Curated list of NIM-available models (Llama, Mixtral)
+
+### GenericOpenAIAdapter
+- **ID:** configurable
+- **Status:** Universal plug-and-play
+- **Detection:** Queries any OpenAI-compatible `/v1/models` endpoint
+- **Auto-discovery:** Scans 11 common endpoints (Ollama, LM Studio, vLLM, LiteLLM, OpenRouter, OpenAI, Groq, Together, DeepSeek, Fireworks, Mistral)
+- **Custom:** Accepts any base URL — no code changes needed for new gateways
+
+## Stub adapters
+
+These adapters have full typed interfaces ready but require the target environment for real detection:
 
 ### HermesAdapter
 - **ID:** `hermes`
