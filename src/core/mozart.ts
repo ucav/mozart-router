@@ -189,6 +189,25 @@ export class Mozart {
     return `[Recommendation only] Route: ${route.selectedGateway ?? 'direct'} / ${route.selectedProvider} / ${route.selectedModel}`;
   }
 
+  async detectAll(): Promise<number> {
+    let modelsFound = 0;
+    for (const adapter of this.registry.listAdapters()) {
+      try {
+        const detection = await adapter.detect();
+        this.registry.recordDetection(detection);
+        if (detection.detected) {
+          const providers = await adapter.listProviders();
+          const models = await adapter.listModels();
+          this.registry.mergeFromAdapter(adapter.id, providers, models);
+          modelsFound += models.length;
+        }
+      } catch {
+        // skip adapters that fail
+      }
+    }
+    return modelsFound;
+  }
+
   getInventory(): InventorySnapshot {
     return this.registry.snapshot();
   }

@@ -1,99 +1,107 @@
 # Mozart
 
-**Local orchestration and routing for AI agents.**
-Gateway-first, agent-first, integration-first.
+**Mozart is the local conductor for AI agents** — a gateway-aware routing and orchestration layer that integrates as a skill, tool, adapter or middleware into your existing AI stack.
 
 Mozart detects your available gateways, providers and models, then routes each task to the best option based on cost, context, latency, privacy, quotas and reliability.
 
-Works with OpenCode, OpenClaw, Hermes Agent, Cursor, LiteLLM, OpenRouter, Ollama and custom agent stacks.
-
-## Why Mozart?
-
-- **Stop choosing models manually.** Mozart classifies your task and picks the best model.
-- **Stop wasting tokens.** Context optimization reduces token usage by selecting relevant content.
-- **Stop leaking sensitive context.** Privacy Guard prevents secrets from being sent to cloud models.
-- **Stop breaking agent workflows when providers fail.** Automatic fallback chains keep your agents running.
-
-Mozart conducts your AI stack locally.
-
 ```
+Gateways execute. Mozart decides.
+
 Do not rebuild what the gateway already does.
 Detect it, understand it, orchestrate it.
 ```
 
+## Why Mozart?
+
+- **Stop choosing models manually.** Mozart classifies your task and picks the best model.
+- **Stop wasting tokens.** Context optimization reduces token usage.
+- **Stop leaking sensitive context.** Privacy Guard prevents secrets from being sent to cloud models.
+- **Stop breaking agent workflows when providers fail.** Automatic fallback chains keep your agents running.
+- **Understand every decision.** Every route comes with a full explanation — why this model, why not the others.
+
+## What Mozart is
+
+- A **skill** callable by OpenClaw, OpenCode, Hermes or custom agents
+- A **tool** that agents can invoke for routing decisions
+- An **adapter** that reads existing gateway configs without duplicating them
+- A **middleware** you can insert between your agent and its gateway
+- A **local SDK** you import into your own TypeScript/Node.js projects
+- A **CLI** for diagnostics, simulation, and reporting
+
+## What Mozart is NOT
+
+- Not a desktop application or separate dashboard
+- Not a replacement for LiteLLM, OpenRouter, or your existing gateways
+- Not a tool that asks you to re-enter all your API keys
+- Not a system that stores or manages keys that gateways already handle
+
 ## Quick start
 
 ```bash
-# Clone and install
 git clone https://github.com/ucav/mozart-router.git
 cd mozart-router
 npm install
 npm run build
 
-# Detect your stack
-npm run mozart -- doctor
+# Integration-first — detect your existing stack
+npx mozart-router init --gateway opencode
+npx mozart-router init --gateway openclaw
+npx mozart-router init --gateway hermes
 
-# Simulate a task
-npm run mozart -- simulate "debug my Next.js build error"
+# Discover what's already available
+npx mozart-router doctor
 
-# Route a task
-npm run mozart -- route "write Playwright tests"
+# See your full inventory
+npx mozart-router inventory
 
-# Explain last decision
-npm run mozart -- why
+# Simulate routing before executing
+npx mozart-router simulate "debug my Next.js build error"
+
+# Route a task (recommend-only by default)
+npx mozart-router route "write Playwright tests"
+
+# Understand the decision
+npx mozart-router why
 
 # Session report
-npm run mozart -- report
+npx mozart-router report
 
-# List available skills
-npm run mozart -- skills
+# List available Mozart skills for your agents
+npx mozart-router skills
 ```
 
-Once published to npm:
-```bash
-npm install mozart-router
-npx mozart-router doctor
+> Note: until published to npm, use `npm run mozart -- <command>` for local development. The `npx mozart-router` commands will work after `npm publish`.
 
 ## Integration modes
 
-### 1. As a skill (for OpenClaw, Hermes, OpenCode)
+### 1. Skill mode — for OpenClaw, OpenCode, Hermes
 
-Copy the appropriate skill manifest from `examples/` into your agent configuration:
+Copy the skill manifest from `examples/` into your agent:
 
 ```bash
-# For OpenCode
-npx mozart-router init --gateway opencode
-
-# For OpenClaw
-npx mozart-router init --gateway openclaw
-
-# For Hermes
-npx mozart-router init --gateway hermes
+npx mozart-router init --gateway opencode    # → examples/opencode/mozart-skill.json
+npx mozart-router init --gateway openclaw    # → examples/openclaw/mozart-skill.yaml
+npx mozart-router init --gateway hermes      # → examples/hermes/mozart-tool.json
 ```
 
-### 2. As an SDK (in your agent code)
+### 2. SDK mode — import into your agent code
 
 ```typescript
-import { Mozart, OllamaAdapter, OpenRouterAdapter } from 'mozart-router';
+import { Mozart, OllamaAdapter, OpenRouterAdapter, OpenClawAdapter } from 'mozart-router';
 
 const mozart = new Mozart();
 
 // Register adapters — Mozart auto-detects each gateway
 mozart.registry.registerAdapter(new OllamaAdapter());
 mozart.registry.registerAdapter(new OpenRouterAdapter());
+mozart.registry.registerAdapter(new OpenClawAdapter());
 
-for (const adapter of mozart.registry.listAdapters()) {
-  const detection = await adapter.detect();
-  if (detection.detected) {
-    const providers = await adapter.listProviders();
-    const models = await adapter.listModels();
-    mozart.registry.mergeFromAdapter(adapter.id, providers, models);
-  }
-}
+// Discover all gateways
+await mozart.detectAll();
 
 // Route a task
 const route = await mozart.recommend('write a function to sort an array');
-console.log(route.selectedModel);  // "qwen3:8b"
+console.log(route.selectedModel); // e.g. "qwen3:8b"
 
 // Full processing with privacy, cost, explanation
 const response = await mozart.process({
@@ -102,20 +110,33 @@ const response = await mozart.process({
   privacyMode: 'balanced',
   executionMode: 'recommend',
 });
-
-console.log(response.explanation);
 ```
 
-### 3. As an adapter
-
-Mozart adapters introspect existing gateways without duplicating their functionality:
+### 3. Adapter mode — introspect any gateway
 
 ```typescript
-import { OllamaAdapter, LiteLLMAdapter } from 'mozart-router';
+import { OllamaAdapter } from 'mozart-router';
 
 const ollama = new OllamaAdapter();
 const detection = await ollama.detect();
 const models = await ollama.listModels();
+// Build inventory without touching API keys
+```
+
+### 4. Middleware mode — OpenAI-compatible proxy
+
+```bash
+npm run mozart -- proxy --port=4445
+# Point your agent to http://127.0.0.1:4445/v1
+# Mozart routes every chat completion to the best model
+```
+
+### 5. Recommend-only mode — advisory without execution
+
+```typescript
+const recommendation = await mozart.recommend('security audit payment module');
+// Returns: selected model, confidence, cost estimate, explanation
+// No execution — your existing gateway handles the actual call
 ```
 
 ## Architecture
@@ -123,47 +144,32 @@ const models = await ollama.listModels();
 ```
 User / Agent / IDE
         |
-Mozart Interface Layer
+Mozart Interface (CLI · SDK · Skills · API · Middleware)
         |
-Gateway Introspection Layer → detects existing configs
+Gateway Introspection Layer → detects existing configs non-destructively
         |
 Provider & Model Inventory  → built from detected gateways
         |
-Task Classifier             → classifies task heuristically
+Task Classifier             → heuristic, local, no LLM needed
         |
-Policy Engine               → applies user policies
+Policy Engine               → privacy, budget, routing rules
         |
-Privacy Guard               → scans for secrets/PII
+Privacy Guard               → scans for secrets, blocks cloud leaks
         |
-Context Optimizer           → reduces token usage
+Context Optimizer           → reduces token waste
         |
-Routing Engine              → scores and selects best model
+Routing Engine              → 7-dimension scoring per model
+        |
+Explainability              → every decision explained
         |
 Execution Delegation        → delegates to existing gateway
         |
-Existing Gateway            → executes the call
+Existing Gateway            → LiteLLM · OpenRouter · Ollama · ...
 ```
 
-## Mozart does NOT
+## Feature matrix
 
-- Replace your gateways (LiteLLM, OpenRouter, etc.)
-- Store or manage API keys that gateways already handle
-- Require manual model selection
-- Send data to the cloud by default
-- Be an application desktop or separate dashboard
-- Include mandatory telemetry
-
-## Mozart DOES
-
-- Detect your existing AI stack automatically
-- Build an inventory from your configured gateways
-- Classify tasks heuristically
-- Apply privacy and budget policies
-- Score and select the best model for each task
-- Optimize context before sending
-- Explain every routing decision
-- Work in recommend-only mode
-- Delegate execution to existing gateways
+See [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md) for the complete status of every module.
 
 ## Core commands
 
@@ -172,17 +178,18 @@ Existing Gateway            → executes the call
 | `mozart doctor` | Detect gateways, providers and models |
 | `mozart inventory` | Show full inventory as JSON |
 | `mozart simulate <task>` | Simulate routing for a task |
-| `mozart route <task>` | Route a task (recommend mode) |
+| `mozart route <task>` | Route a task (recommend-only) |
 | `mozart why` | Explain the last routing decision |
 | `mozart report` | Show session report |
 | `mozart skills` | List available Mozart skills |
 | `mozart profiles` | List built-in policy profiles |
+| `mozart policy list` | List available policy profiles |
 | `mozart start [--port=4444]` | Start local HTTP API |
 | `mozart proxy [--port=4445]` | Start OpenAI-compatible middleware |
-| `mozart policy list` | List available policy profiles |
 | `mozart scan-local` | Scan local hardware capabilities |
 | `mozart sync dealsforge` | Load DealsForge provider intelligence |
 | `mozart init --gateway <name>` | Generate integration files |
+| `mozart reset` | Clear all local data |
 
 ## Skills
 
@@ -198,15 +205,35 @@ Mozart exposes these skills for agents:
 | `mozart.fallback_plan` | Generate fallback execution plan |
 | `mozart.inventory` | Return current inventory |
 
+## Documentation
+
+| Document | Content |
+|----------|---------|
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | System design and module dependencies |
+| [GATEWAY_FIRST_PRINCIPLES](docs/GATEWAY_FIRST_PRINCIPLES.md) | Why Mozart doesn't replace gateways |
+| [FEATURE_MATRIX](docs/FEATURE_MATRIX.md) | Complete feature status |
+| [INTEGRATIONS](docs/INTEGRATIONS.md) | Supported gateways and agents |
+| [ADAPTERS](docs/ADAPTERS.md) | Adapter reference and how to create new ones |
+| [SKILLS_AND_TOOLS](docs/SKILLS_AND_TOOLS.md) | Skill/tool manifest reference |
+| [RECOMMEND_ONLY_MODE](docs/RECOMMEND_ONLY_MODE.md) | How Mozart works without execution |
+| [SECURITY](docs/SECURITY.md) | Security design and privacy guard |
+| [LIMITATIONS](docs/LIMITATIONS.md) | Honest limits and constraints |
+| [ROADMAP](docs/ROADMAP.md) | Development plans |
+
 ## Security
 
-- All secrets are redacted in logs
+- All secrets are redacted in logs (see [SECURITY](docs/SECURITY.md))
 - No API keys are stored or logged
 - Privacy Guard scans content before routing
 - Local-only mode prevents cloud routing
 - No mandatory telemetry
 - All processing is local by default
+- See [reports/SECURITY_AUDIT.md](reports/SECURITY_AUDIT.md) for full audit
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE)

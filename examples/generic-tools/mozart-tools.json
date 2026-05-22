@@ -1,0 +1,86 @@
+{
+  "name": "mozart-router",
+  "version": "0.1.0",
+  "type": "tool-collection",
+  "description": "Mozart tool collection for AI agents — route models, estimate costs, check privacy, compress context",
+  "tools": [
+    {
+      "name": "mozart.route_model",
+      "description": "Choose the best available model/provider/gateway for an AI task based on cost, context, latency, privacy, and capabilities.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task": { "type": "string", "description": "The task to route" },
+          "privacy_mode": { "type": "string", "enum": ["open", "balanced", "privacy_first", "local_only"] },
+          "budget_mode": { "type": "string", "enum": ["lowest", "balanced", "quality"] }
+        },
+        "required": ["task"]
+      }
+    },
+    {
+      "name": "mozart.explain_route",
+      "description": "Explain why Mozart chose a specific model/provider for the last routing decision."
+    },
+    {
+      "name": "mozart.estimate_cost",
+      "description": "Estimate the token usage and cost for a given task before execution.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task": { "type": "string", "description": "Task description" },
+          "context": { "type": "string", "description": "Context to include" },
+          "model": { "type": "string", "description": "Target model (optional)" }
+        },
+        "required": ["task"]
+      }
+    },
+    {
+      "name": "mozart.compress_context",
+      "description": "Optimize and compress context to reduce token usage while preserving relevant information.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string", "description": "Content to compress" },
+          "max_tokens": { "type": "number", "description": "Maximum tokens allowed" },
+          "strategy": { "type": "string", "enum": ["compress", "truncate", "summarize", "select_relevant"] }
+        },
+        "required": ["content"]
+      }
+    },
+    {
+      "name": "mozart.privacy_check",
+      "description": "Scan content for secrets, API keys, tokens, and sensitive data before sending to a model.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string", "description": "Content to scan" },
+          "privacy_mode": { "type": "string", "enum": ["open", "balanced", "privacy_first", "local_only"] }
+        },
+        "required": ["content"]
+      }
+    },
+    {
+      "name": "mozart.fallback_plan",
+      "description": "Generate a fallback execution plan in case the primary model/provider fails.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task": { "type": "string", "description": "Task description" },
+          "primary_model": { "type": "string", "description": "Primary model ID" }
+        },
+        "required": ["task"]
+      }
+    },
+    {
+      "name": "mozart.inventory",
+      "description": "Return the current inventory of detected gateways, providers, and models available to Mozart."
+    }
+  ],
+  "integration": {
+    "package": "mozart-router",
+    "install": "npm install mozart-router",
+    "import": "import { Mozart } from 'mozart-router'",
+    "init": "const mozart = new Mozart()",
+    "usage": "const route = await mozart.recommend(task)"
+  }
+}
