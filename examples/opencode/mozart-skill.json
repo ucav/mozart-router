@@ -1,0 +1,64 @@
+{
+  "name": "mozart.route_model",
+  "description": "Choose the best available model/provider/gateway for a task",
+  "version": "0.1.0",
+  "type": "skill",
+  "integration": {
+    "provider": "mozart-router",
+    "method": "sdk",
+    "package": "mozart-router"
+  },
+  "input": {
+    "task": {
+      "type": "string",
+      "description": "The task to route",
+      "required": true
+    },
+    "context_size": {
+      "type": "number",
+      "description": "Estimated context size in tokens"
+    },
+    "privacy_mode": {
+      "type": "string",
+      "description": "Privacy level",
+      "enum": ["open", "balanced", "privacy_first", "local_only"],
+      "default": "balanced"
+    },
+    "budget_mode": {
+      "type": "string",
+      "description": "Budget preference",
+      "enum": ["lowest", "balanced", "quality"],
+      "default": "balanced"
+    }
+  },
+  "output": {
+    "selected_gateway": {
+      "type": "string",
+      "description": "Selected gateway"
+    },
+    "selected_provider": {
+      "type": "string",
+      "description": "Selected provider"
+    },
+    "selected_model": {
+      "type": "string",
+      "description": "Selected model"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Confidence score (0-1)"
+    },
+    "estimated_cost": {
+      "type": "number",
+      "description": "Estimated cost in USD"
+    },
+    "explanation": {
+      "type": "array",
+      "description": "Human-readable explanation"
+    }
+  },
+  "usage": {
+    "import": "import { Mozart } from 'mozart-router'",
+    "example": "const mozart = new Mozart();\nconst route = await mozart.recommend(task);"
+  }
+}

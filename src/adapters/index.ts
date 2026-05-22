@@ -1,0 +1,12 @@
+export { OllamaAdapter } from './ollama';
+export { LiteLLMAdapter } from './litellm';
+export { OpenRouterAdapter } from './openrouter';
+export { OpenCodeAdapter } from './opencode';
+export { OpenClawAdapter } from './openclaw';
+export { HermesAdapter } from './hermes';
+export { CursorAdapter } from './cursor';
+export { LMStudioAdapter } from './lmstudio';
+export { VllmAdapter } from './vllm';
+export { NvidiaNimAdapter } from './nim';
+export { GenericOpenAIAdapter, discoverAllGenericAdapters } from './generic';
+export type { GenericAdapterConfig } from './generic';

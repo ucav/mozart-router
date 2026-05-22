@@ -1,0 +1,14 @@
+{
+  "providers": {
+    "openrouter": {
+      "base_url": "https://openrouter.ai/api/v1",
+      "auth": "Bearer ${OPENROUTER_API_KEY}"
+    }
+  },
+  "preferences": {
+    "default_model": "auto",
+    "fallback_enabled": true,
+    "max_cost_per_call": 0.5
+  },
+  "mozart_note": "Mozart detects OpenRouter via OPENROUTER_API_KEY env var. No additional configuration needed."
+}

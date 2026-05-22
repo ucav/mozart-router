@@ -1,0 +1,48 @@
+{
+  "name": "mozart-router",
+  "version": "0.1.0",
+  "description": "Local orchestration and routing layer for AI agents — gateway-first, agent-first, integration-first.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mozart-router": "./dist/cli/main.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "mozart": "node dist/cli/main.js",
+    "dev": "tsx src/cli/main.ts"
+  },
+  "keywords": [
+    "ai",
+    "orchestration",
+    "routing",
+    "gateway",
+    "agent",
+    "llm",
+    "local"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  },
+  "optionalDependencies": {
+    "tsx": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "examples",
+    "README.md"
+  ]
+}

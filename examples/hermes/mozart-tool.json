@@ -1,0 +1,48 @@
+{
+  "name": "mozart.route_model",
+  "description": "Choose the best available model/provider/gateway for a task",
+  "version": "0.1.0",
+  "type": "tool",
+  "source": {
+    "package": "mozart-router",
+    "method": "sdk"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "task": {
+        "type": "string",
+        "description": "The task to route"
+      },
+      "privacy_mode": {
+        "type": "string",
+        "description": "Privacy level",
+        "enum": ["open", "balanced", "privacy_first", "local_only"]
+      },
+      "budget_mode": {
+        "type": "string",
+        "description": "Budget preference",
+        "enum": ["lowest", "balanced", "quality"]
+      }
+    },
+    "required": ["task"]
+  },
+  "returns": {
+    "type": "object",
+    "properties": {
+      "selected_gateway": { "type": "string" },
+      "selected_provider": { "type": "string" },
+      "selected_model": { "type": "string" },
+      "confidence": { "type": "number" },
+      "estimated_cost": { "type": "number" },
+      "fallback_chain": { "type": "array" },
+      "explanation": { "type": "array" }
+    }
+  },
+  "usage": {
+    "install": "npm install mozart-router",
+    "import": "import { Mozart } from 'mozart-router'",
+    "init": "const mozart = new Mozart()",
+    "call": "const result = await mozart.route(task)"
+  }
+}

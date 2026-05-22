@@ -1,0 +1,39 @@
+# LiteLLM + Mozart integration
+
+# Mozart detects this config automatically via LiteLLMAdapter.
+# No changes needed to this file — Mozart reads it as-is.
+
+model_list:
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: ${OPENAI_API_KEY}
+
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: ${ANTHROPIC_API_KEY}
+
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: ${DEEPSEEK_API_KEY}
+
+  - model_name: qwen-local
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: http://localhost:11434
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
+general_settings:
+  master_key: ${LITELLM_MASTER_KEY}
+
+# How Mozart works with LiteLLM:
+# 1. Detects this config file automatically
+# 2. Reads model entries without accessing raw API keys
+# 3. Builds inventory from existing configuration
+# 4. Routes tasks to the best model via LiteLLM proxy
+# 5. Never stores or manages your API keys

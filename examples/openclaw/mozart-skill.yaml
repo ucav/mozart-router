@@ -1,0 +1,80 @@
+# Mozart skills for OpenClaw
+
+skills:
+  - name: mozart.route_model
+    description: Choose the best available model/provider/gateway for a task
+    input:
+      task:
+        type: string
+        description: The task to route
+        required: true
+      privacy_mode:
+        type: string
+        description: Privacy level (open, balanced, privacy_first, local_only)
+        default: balanced
+      budget_mode:
+        type: string
+        description: Budget preference (lowest, balanced, quality)
+        default: balanced
+    output:
+      selected_gateway: string
+      selected_provider: string
+      selected_model: string
+      confidence: number
+      estimated_cost: number
+      fallback_chain: array
+      explanation: array
+
+  - name: mozart.estimate_cost
+    description: Estimate cost and tokens for a task before execution
+    input:
+      task:
+        type: string
+        description: Task description
+        required: true
+      context:
+        type: string
+        description: Context to include
+    output:
+      estimated_input_tokens: number
+      estimated_output_tokens: number
+      estimated_cost: number
+      currency: string
+
+  - name: mozart.compress_context
+    description: Optimize context to reduce token usage
+    input:
+      content:
+        type: string
+        description: Content to compress
+        required: true
+      max_tokens:
+        type: number
+        description: Maximum tokens
+    output:
+      strategy: string
+      original_tokens: number
+      compressed_tokens: number
+      compression_ratio: number
+
+  - name: mozart.privacy_check
+    description: Scan content for secrets before sending to models
+    input:
+      content:
+        type: string
+        description: Content to scan
+        required: true
+    output:
+      allowed: boolean
+      findings: array
+      action: string
+      redacted_content: string
+
+  - name: mozart.inventory
+    description: Return current inventory of detected gateways, providers, and models
+
+# Integration instructions
+# 1. Install: npm install mozart-router
+# 2. Import in OpenClaw: import { Mozart } from 'mozart-router'
+# 3. Initialize: const mozart = new Mozart()
+# 4. Call skills: const route = await mozart.recommend(task)
