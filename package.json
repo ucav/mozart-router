@@ -25,6 +25,11 @@
     "local"
   ],
   "license": "MIT",
+  "author": "Ucav",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ucav/mozart-router.git"
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "typescript": "^5.3.3",
