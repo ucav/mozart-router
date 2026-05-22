@@ -1,5 +1,10 @@
 # Mozart
 
+[![CI](https://github.com/ucav/mozart-router/actions/workflows/ci.yml/badge.svg)](https://github.com/ucav/mozart-router/actions)
+[![Tests](https://img.shields.io/badge/tests-118%20passed-brightgreen)](https://github.com/ucav/mozart-router)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/ucav/mozart-router)
+
 **Mozart is the local conductor for AI agents** — a gateway-aware routing and orchestration layer that integrates as a skill, tool, adapter or middleware into your existing AI stack.
 
 Mozart detects your available gateways, providers and models, then routes each task to the best option based on cost, context, latency, privacy, quotas and reliability.
@@ -184,8 +189,14 @@ See [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md) for the complete status of 
 | `mozart skills` | List available Mozart skills |
 | `mozart profiles` | List built-in policy profiles |
 | `mozart policy list` | List available policy profiles |
-| `mozart start [--port=4444]` | Start local HTTP API |
+| `mozart start [--port=4444]` | Start local HTTP API + dashboard |
+| `mozart stream [--port=4445]` | Start streaming middleware (SSE) |
 | `mozart proxy [--port=4445]` | Start OpenAI-compatible middleware |
+| `mozart mcp` | Start MCP server (stdlib) |
+| `mozart config init` | Interactive config generator |
+| `mozart plugins` | List registered plugins |
+| `mozart metrics` | Export metrics (JSON + Prometheus) |
+| `mozart health` | Health check all adapters |
 | `mozart scan-local` | Scan local hardware capabilities |
 | `mozart sync dealsforge` | Load DealsForge provider intelligence |
 | `mozart init --gateway <name>` | Generate integration files |
