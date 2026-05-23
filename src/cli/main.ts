@@ -27,6 +27,8 @@ import { MozartMcpServer } from '../api/mcp';
 import { pluginRegistry } from '../core/plugins';
 import { HealthChecker } from '../core/health';
 import { MetricsCollector } from '../core/metrics';
+import { DynamicPricing } from '../cost/dynamic-pricing';
+import { ReliabilityTracker } from '../core/reliability';
 import { interactiveConfigInit } from './config-init';
 
 async function main() {
@@ -73,6 +75,7 @@ async function main() {
     case 'config': await configCommand(args.slice(1)); break;
     case 'plugins': await pluginsList(); break;
     case 'metrics': await metricsCommand(mozart); break;
+    case 'pricing': await pricingCommand(mozart, args.slice(1)); break;
     case 'health': await healthCommand(mozart); break;
     case 'help':
     case '--help':
@@ -512,6 +515,44 @@ async function healthCommand(mozart: Mozart) {
   console.log('');
 }
 
+async function pricingCommand(mozart: Mozart, args: string[]) {
+  if (args[0] === 'sync') {
+    console.log('Fetching live pricing from OpenRouter...');
+    const pricing = new DynamicPricing();
+    const results = await pricing.fetchOpenRouter();
+    console.log(`Fetched ${results.length} model prices from OpenRouter.`);
+
+    // Enrich existing models
+    const models = mozart.registry.listModels();
+    const enriched = pricing.enrichModels(models, results);
+    let updated = 0;
+    for (const model of enriched) {
+      const existing = mozart.registry.getModel(model.providerId, model.id);
+      if (existing && (existing.inputPrice !== model.inputPrice || existing.contextWindow !== model.contextWindow)) {
+        mozart.registry.addModel(model);
+        updated++;
+      }
+    }
+    console.log(`Updated ${updated} models with live pricing data.`);
+    console.log(`Sample prices (per 1M tokens):`);
+    for (const r of results.slice(0, 5)) {
+      console.log(`  ${r.modelId}: $${(r.inputPrice ?? 0).toFixed(2)} input / $${(r.outputPrice ?? 0).toFixed(2)} output`);
+    }
+  } else if (args[0] === 'list') {
+    const pricing = new DynamicPricing();
+    const cached = pricing.getAllPrices();
+    if (cached.length === 0) {
+      console.log('No pricing cached. Run `mozart pricing sync` first.');
+    } else {
+      for (const p of cached.slice(0, 10)) {
+        console.log(`  ${p.modelId}: in=$${p.inputPrice} out=$${p.outputPrice} (ctx=${p.contextWindow})`);
+      }
+    }
+  } else {
+    console.log('Usage: mozart pricing sync|list');
+  }
+}
+
 function printHelp() {
   console.log(`
 Mozart — Local orchestration and routing for AI agents.
@@ -534,6 +575,7 @@ Usage:
   mozart config init                Interactive config generator
   mozart plugins                    List registered plugins
   mozart metrics                    Export metrics (JSON + Prometheus)
+  mozart pricing sync|list           Fetch live model pricing data
   mozart health                     Run health check on all adapters
   mozart sync dealsforge            Sync DealsForge provider/model data
   mozart scan-local                 Scan local hardware capabilities

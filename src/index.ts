@@ -32,8 +32,16 @@ export type { ProfileDefinition } from './policy/profiles';
 export { loadMozartConfig, generateDefaultConfig } from './policy/yaml-loader';
 export type { LoadResult } from './policy/yaml-loader';
 
+export { DynamicPricing } from './cost/dynamic-pricing';
+export type { LivePricingResult } from './cost/dynamic-pricing';
+
+export { ReliabilityTracker } from './core/reliability';
+export type { ProviderReliability } from './core/reliability';
+
 export { PrivacyGuard } from './privacy/guard';
 export { ContextOptimizer } from './context/optimizer';
+export { AdvancedContextOptimizer } from './context/advanced-optimizer';
+export type { SummarizeOptions } from './context/advanced-optimizer';
 export { CostEstimator } from './cost/estimator';
 export { ExplainabilityEngine } from './explain/engine';
 
