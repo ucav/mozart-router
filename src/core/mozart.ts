@@ -17,6 +17,7 @@ import { RoutingEngine } from '../routing/router';
 import { PolicyEngine } from '../policy/engine';
 import { PrivacyGuard } from '../privacy/guard';
 import { ContextOptimizer } from '../context/optimizer';
+import { AdvancedContextOptimizer } from '../context/advanced-optimizer';
 import { CostEstimator } from '../cost/estimator';
 import { ExplainabilityEngine } from '../explain/engine';
 import { Logger } from '../logs/logger';
@@ -34,6 +35,7 @@ export class Mozart {
   public router: RoutingEngine;
   public privacyGuard: PrivacyGuard;
   public contextOptimizer: ContextOptimizer;
+  public advancedContextOptimizer: AdvancedContextOptimizer;
   public costEstimator: CostEstimator;
   public explainer: ExplainabilityEngine;
   public logger: Logger;
@@ -47,6 +49,7 @@ export class Mozart {
     this.classifier = new TaskClassifier();
     this.privacyGuard = new PrivacyGuard(this.logger);
     this.contextOptimizer = new ContextOptimizer();
+    this.advancedContextOptimizer = new AdvancedContextOptimizer();
     this.costEstimator = new CostEstimator();
     this.router = new RoutingEngine(
       this.registry,
@@ -206,6 +209,17 @@ export class Mozart {
       }
     }
     return modelsFound;
+  }
+
+  /**
+   * Compress content using the AdvancedContextOptimizer (Ollama-powered
+   * summarization with fallback to smart truncation when Ollama is unavailable).
+   */
+  async compressAdvanced(
+    content: string,
+    options?: { maxSummaryTokens?: number; model?: string },
+  ): Promise<string> {
+    return this.advancedContextOptimizer.summarize(content, options);
   }
 
   getInventory(): InventorySnapshot {

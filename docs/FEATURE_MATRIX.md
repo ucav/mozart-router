@@ -9,7 +9,7 @@
 | Model inventory | implemented | `InventoryRegistry` — per-provider, per-gateway | Includes pricing, context window, capabilities |
 | Generic OpenAI auto-discovery | implemented | `GenericOpenAIAdapter` + `discoverAllGenericAdapters()` | Plug-and-play for any OpenAI-compatible endpoint |
 | DealsForge sync | implemented | `syncDealsForgeData()` — curated model catalog | Static data; future: live API |
-| CanRunIt local scan | implemented | `scanLocalCapability()` — CPU, RAM, OS | GPU detection needs native module |
+| CanRunIt local scan | implemented | `scanLocalCapability()` — CPU, RAM, OS, GPU (nvidia-smi / system_profiler), Ollama model count | GPU detection via system commands |
 
 ## Classification & Routing
 
@@ -36,7 +36,7 @@
 | Feature | Status | Implementation | Notes |
 |---------|--------|---------------|-------|
 | Recommend-only mode | implemented | All routing methods return decision without executing | Default mode |
-| Delegated execution | implemented | `Mozart.delegate()` — routes to gateway adapter | Only executes if adapter supports it |
+| Delegated execution | implemented | `Mozart.delegate()` — routes to gateway adapter | Executes if adapter supports it |
 | OpenAI-compatible middleware | implemented | `MozartMiddleware` — `/v1/chat/completions` with auto-routing | Transparent proxy mode |
 | HTTP API | implemented | `MozartApiServer` — 8 endpoints (health, inventory, route, simulate, explain, report, compress, policy) | Local-only by default |
 
@@ -45,6 +45,7 @@
 | Feature | Status | Implementation | Notes |
 |---------|--------|---------------|-------|
 | Context optimizer | implemented | `ContextOptimizer` — 4 strategies (send_all, compress, truncate, select_relevant) | Token estimation, budget-aware |
+| Advanced context optimizer | implemented | `AdvancedContextOptimizer` — Ollama-powered summarization, smart truncation fallback | Via `Mozart.compressAdvanced()` and `POST /v1/context/compress` with `advanced: true` |
 | Result cache | implemented | `ResultCache` — TTL, LRU eviction, hit tracking | In-memory, configurable size |
 
 ## Logging & Persistence
@@ -57,24 +58,24 @@
 
 ## Adapters — Real
 
-| Adapter | Status | Detection method |
-|---------|--------|-----------------|
-| Ollama | implemented | CLI: `ollama --version`, `ollama list` |
-| OpenClaw | implemented | File: reads `~/.openclaw/openclaw.json` |
-| OpenCode | implemented | Env vars + file: checks `OPENCODE_CLIENT`, data dir |
-| LiteLLM | implemented | File: scans 6 paths for `litellm_config.yaml` |
-| OpenRouter | implemented | Env: checks `OPENROUTER_API_KEY` |
-| LM Studio | implemented | HTTP: queries `localhost:1234/v1/models` |
-| vLLM | implemented | HTTP: queries `localhost:8000/v1/models` |
-| NVIDIA NIM | implemented | Env + HTTP: checks `NVIDIA_API_KEY`, local endpoint |
-| Generic OpenAI | implemented | HTTP: queries any `/v1/models` endpoint. Auto-discovers 11 endpoints |
+| Adapter | Status | Detection method | Execute |
+|---------|--------|-----------------|---------|
+| Ollama | implemented | CLI: `ollama --version`, `ollama list` | HTTP → `localhost:11434/api/generate` |
+| OpenClaw | implemented | File: reads `~/.openclaw/openclaw.json` | HTTP → gateway port from config |
+| OpenCode | implemented | Env vars + file: checks `OPENCODE_CLIENT`, data dir | Recommend-only |
+| LiteLLM | implemented | File: scans 6 paths for `litellm_config.yaml` | HTTP → `localhost:4000/v1/chat/completions` |
+| OpenRouter | implemented | Env: checks `OPENROUTER_API_KEY` | HTTP → `api.openrouter.ai` (live models + execution) |
+| LM Studio | implemented | HTTP: queries `localhost:1234/v1/models` | HTTP → `localhost:1234/v1/chat/completions` |
+| vLLM | implemented | HTTP: queries `localhost:8000/v1/models` | HTTP → `localhost:8000/v1/chat/completions` |
+| NVIDIA NIM | implemented | Env + HTTP: checks `NVIDIA_API_KEY`, local endpoint | HTTP → `localhost:8000/v1/chat/completions` |
+| Cursor | implemented | Binary in PATH + config directory (`~/.cursor`, `~/Library/Application Support/Cursor`, etc.) | Recommend-only (Cursor manages execution) |
+| Generic OpenAI | implemented | HTTP: queries any `/v1/models` endpoint. Auto-discovers 11 endpoints | HTTP → any `/v1/chat/completions` |
 
 ## Adapters — Stubs
 
 | Adapter | Status | Notes |
 |---------|--------|-------|
 | Hermes Agent | adapter stub | Full interface + manifest at `examples/hermes/mozart-tool.json` |
-| Cursor | adapter stub | Full interface, documented integration path |
 
 ## Skills & Tools
 
@@ -98,7 +99,7 @@
 |---------|--------|---------------|
 | CLI | implemented | 13 commands |
 | SDK | implemented | Full TypeScript exports |
-| Tests | implemented | 102 tests, 15 files, Vitest |
+| Tests | implemented | 149 tests, 25 files, Vitest |
 | Docs | implemented | 12 docs files |
 | Examples | implemented | 7 example directories |
 | CI/Lint | implemented | `tsc --noEmit` |

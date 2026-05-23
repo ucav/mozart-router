@@ -9,25 +9,24 @@ import {
   ExecutionResult,
   RouteDecision,
 } from '../types';
-import * as os from 'os';
 
 export class OpenRouterAdapter implements GatewayAdapter {
   id = 'openrouter';
   name = 'OpenRouter';
 
+  private apiKey(): string | undefined {
+    return process.env.OPENROUTER_API_KEY ?? process.env.OR_API_KEY ?? process.env.OPENROUTER_KEY;
+  }
+
   private hasApiKey(): boolean {
-    return !!(
-      process.env.OPENROUTER_API_KEY ||
-      process.env.OR_API_KEY ||
-      process.env.OPENROUTER_KEY
-    );
+    return !!this.apiKey();
   }
 
   async detect(): Promise<DetectionResult> {
     const details: string[] = [];
-    const hasKey = this.hasApiKey();
+    const key = this.apiKey();
 
-    if (hasKey) {
+    if (key) {
       const keyRef = process.env.OPENROUTER_API_KEY
         ? 'OPENROUTER_API_KEY'
         : process.env.OR_API_KEY
@@ -39,12 +38,12 @@ export class OpenRouterAdapter implements GatewayAdapter {
     }
 
     return {
-      detected: hasKey,
+      detected: !!key,
       gatewayId: this.id,
       gatewayName: this.name,
-      status: hasKey ? 'active' : 'not_found',
-      providersCount: hasKey ? 1 : 0,
-      modelsCount: hasKey ? 200 : 0,
+      status: key ? 'active' : 'not_found',
+      providersCount: key ? 1 : 0,
+      modelsCount: key ? 200 : 0,
       details,
     };
   }
@@ -84,6 +83,54 @@ export class OpenRouterAdapter implements GatewayAdapter {
   async listModels(): Promise<Model[]> {
     if (!this.hasApiKey()) return [];
 
+    // Try live catalog first
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { 'Authorization': `Bearer ${this.apiKey()}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (response.ok) {
+        const data = await response.json() as {
+          data?: Array<{
+            id: string;
+            name?: string;
+            context_length?: number;
+            pricing?: { prompt?: string; completion?: string };
+            architecture?: { modality?: string };
+          }>;
+        };
+        const items = data.data ?? [];
+        if (items.length > 0) {
+          return items.map((m) => {
+            const inputPrice = m.pricing?.prompt ? parseFloat(m.pricing.prompt) * 1e6 : undefined;
+            const outputPrice = m.pricing?.completion ? parseFloat(m.pricing.completion) * 1e6 : undefined;
+            const modality = m.architecture?.modality?.includes('image') ? ['text', 'vision'] : ['text'];
+            return {
+              id: m.id,
+              providerId: 'openrouter',
+              gatewayId: this.id,
+              displayName: m.name ?? m.id,
+              family: m.id.split('/')[0],
+              modality: modality as Model['modality'],
+              contextWindow: m.context_length,
+              inputPrice,
+              outputPrice,
+              latencyClass: 'medium' as const,
+              qualityClass: inputPrice !== undefined && inputPrice > 2 ? 'premium' as const : 'high' as const,
+              strengths: ['openrouter_managed'],
+              weaknesses: [],
+              supportsTools: 'unknown' as const,
+              privacyLevel: 'cloud' as const,
+              availability: 'available' as const,
+              sourceConfidence: 'high' as const,
+              lastCheckedAt: new Date().toISOString(),
+            };
+          });
+        }
+      }
+    } catch { /* fall through to static catalog */ }
+
+    // Static fallback catalog
     return [
       {
         id: 'deepseek/deepseek-chat',
@@ -183,9 +230,60 @@ export class OpenRouterAdapter implements GatewayAdapter {
   }
 
   async execute(request: ExecutionRequest): Promise<ExecutionResult> {
-    if (!this.hasApiKey()) {
-      return { success: false, error: 'No OpenRouter API key configured', delegated: true };
+    const key = this.apiKey();
+    if (!key) {
+      return { success: false, error: 'No OpenRouter API key configured', delegated: false };
     }
-    return { success: false, error: 'Execute via OpenRouter proxy or direct call', delegated: true };
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`,
+          'HTTP-Referer': 'https://github.com/ucav/mozart-router',
+          'X-Title': 'Mozart Router',
+        },
+        body: JSON.stringify({
+          model: request.model,
+          messages: [{ role: 'user', content: request.input }],
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        return {
+          success: false,
+          error: `OpenRouter error ${response.status}: ${errText.slice(0, 200)}`,
+          delegated: false,
+        };
+      }
+
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+
+      return {
+        success: true,
+        output: data.choices?.[0]?.message?.content ?? '',
+        tokens: data.usage
+          ? {
+              input: data.usage.prompt_tokens ?? 0,
+              output: data.usage.completion_tokens ?? 0,
+              total: data.usage.total_tokens ?? 0,
+            }
+          : undefined,
+        delegated: false,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: `OpenRouter execution failed: ${err}`,
+        delegated: false,
+      };
+    }
   }
 }

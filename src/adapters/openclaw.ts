@@ -4,6 +4,10 @@ import {
   GatewayConfigSummary,
   Provider,
   Model,
+  ExecutionTarget,
+  ExecutionRequest,
+  ExecutionResult,
+  RouteDecision,
 } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -188,6 +192,75 @@ export class OpenClawAdapter implements GatewayAdapter {
       return models;
     } catch {
       return [];
+    }
+  }
+
+  private gatewayPort(): number {
+    const configPath = findConfig();
+    if (configPath) {
+      try {
+        const config: OpenClawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        return config.gateway?.port ?? 4000;
+      } catch { /* use default */ }
+    }
+    return 4000;
+  }
+
+  async getExecutionTarget(decision: RouteDecision): Promise<ExecutionTarget> {
+    const port = this.gatewayPort();
+    return {
+      adapter: this.id,
+      provider: decision.selectedProvider,
+      model: decision.selectedModel,
+      baseUrl: `http://localhost:${port}`,
+      apiKeyManagedBy: 'gateway',
+      method: 'gateway_call',
+    };
+  }
+
+  async execute(request: ExecutionRequest): Promise<ExecutionResult> {
+    const port = this.gatewayPort();
+    const baseUrl = request.executionTarget.baseUrl ?? `http://localhost:${port}`;
+
+    try {
+      const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: request.model,
+          messages: [{ role: 'user', content: request.input }],
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+
+      if (!response.ok) {
+        return { success: false, error: `OpenClaw error: ${response.status}` };
+      }
+
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+
+      return {
+        success: true,
+        output: data.choices?.[0]?.message?.content ?? '',
+        tokens: data.usage
+          ? {
+              input: data.usage.prompt_tokens ?? 0,
+              output: data.usage.completion_tokens ?? 0,
+              total: data.usage.total_tokens ?? 0,
+            }
+          : undefined,
+        delegated: false,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: `OpenClaw not reachable at ${baseUrl}: ${err}`,
+        delegated: false,
+      };
     }
   }
 }
