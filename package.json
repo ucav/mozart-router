@@ -1,14 +1,14 @@
 {
   "name": "mozart-router",
-  "version": "0.1.0",
-  "description": "Local orchestration and routing layer for AI agents — gateway-first, agent-first, integration-first.",
+  "version": "0.1.2",
+  "description": "Mozart: local conductor for AI agents — gateway-first orchestration and routing layer.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "mozart-router": "./dist/cli/main.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs');const f='dist/cli/main.js';const c=fs.readFileSync(f,'utf8');if(!c.startsWith('#!/'))fs.writeFileSync(f,'#!/usr/bin/env node\\n'+c)\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",

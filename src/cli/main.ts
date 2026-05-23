@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { Mozart } from '../core/mozart';
 import {
   OllamaAdapter,
