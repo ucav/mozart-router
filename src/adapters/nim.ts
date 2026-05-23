@@ -75,6 +75,39 @@ export class NvidiaNimAdapter implements GatewayAdapter {
   }
 
   async listModels(): Promise<Model[]> {
+    // Try live local endpoint first (when NIM is deployed locally)
+    try {
+      const response = await fetch(`${this.baseUrl}/v1/models`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (response.ok) {
+        const data = await response.json() as { data?: Array<{ id: string; owned_by?: string }> };
+        const items = data.data ?? [];
+        if (items.length > 0) {
+          return items.map((m) => ({
+            id: m.id,
+            providerId: 'nvidia-nim',
+            gatewayId: this.id,
+            displayName: m.id,
+            family: m.owned_by ?? m.id.split('/')[0],
+            modality: ['text'] as Model['modality'],
+            contextWindow: 131072,
+            latencyClass: 'fast' as const,
+            qualityClass: 'high' as const,
+            strengths: ['local', 'fast', 'private'],
+            weaknesses: [],
+            supportsTools: true,
+            supportsJsonMode: true,
+            privacyLevel: 'local' as const,
+            availability: 'available' as const,
+            sourceConfidence: 'high' as const,
+            lastCheckedAt: new Date().toISOString(),
+          }));
+        }
+      }
+    } catch { /* fall through to static catalog */ }
+
+    // Static catalog fallback
     return [
       {
         id: 'meta/llama-3.1-8b-instruct',

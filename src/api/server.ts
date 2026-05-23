@@ -212,6 +212,24 @@ export class MozartApiServer {
     const body = await readBody(req);
     const content = String(body.content ?? body.input ?? '');
     const contextArray = Array.isArray(body.context) ? body.context as string[] : [];
+    const advanced = body.advanced === true;
+
+    if (advanced) {
+      // Use AdvancedContextOptimizer (Ollama-powered summarization with smart fallback)
+      const maxSummaryTokens = typeof body.max_tokens === 'number' ? body.max_tokens : 500;
+      const summary = await this.mozart.compressAdvanced(content, { maxSummaryTokens });
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        strategy: 'summarize',
+        result: summary,
+        estimated_input_tokens: Math.ceil(content.length / 4),
+        estimated_output_tokens: Math.ceil(summary.length / 4),
+        max_tokens: maxSummaryTokens,
+        advanced: true,
+      }));
+      return;
+    }
+
     const strategy = this.mozart.contextOptimizer.optimize(content, contextArray, {
       taskType: 'chat',
       complexity: 'low',

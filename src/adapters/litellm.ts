@@ -212,10 +212,51 @@ export class LiteLLMAdapter implements GatewayAdapter {
   }
 
   async execute(request: ExecutionRequest): Promise<ExecutionResult> {
-    return {
-      success: false,
-      error: 'LiteLLM adapter does not execute directly. Delegate to LiteLLM proxy.',
-      delegated: true,
-    };
+    const baseUrl = request.executionTarget.baseUrl ?? 'http://localhost:4000';
+    try {
+      const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: request.model,
+          messages: [{ role: 'user', content: request.input }],
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        return {
+          success: false,
+          error: `LiteLLM error ${response.status}: ${errText.slice(0, 200)}`,
+          delegated: false,
+        };
+      }
+
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+
+      return {
+        success: true,
+        output: data.choices?.[0]?.message?.content ?? '',
+        tokens: data.usage
+          ? {
+              input: data.usage.prompt_tokens ?? 0,
+              output: data.usage.completion_tokens ?? 0,
+              total: data.usage.total_tokens ?? 0,
+            }
+          : undefined,
+        delegated: false,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: `LiteLLM not reachable at ${baseUrl}: ${err}`,
+        delegated: false,
+      };
+    }
   }
 }
