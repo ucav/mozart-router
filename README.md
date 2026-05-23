@@ -1,9 +1,10 @@
 # Mozart
 
 [![CI](https://github.com/ucav/mozart-router/actions/workflows/ci.yml/badge.svg)](https://github.com/ucav/mozart-router/actions)
+[![npm version](https://img.shields.io/npm/v/mozart-router.svg)](https://www.npmjs.com/package/mozart-router)
+[![npm downloads](https://img.shields.io/npm/dm/mozart-router.svg)](https://www.npmjs.com/package/mozart-router)
 [![Tests](https://img.shields.io/badge/tests-118%20passed-brightgreen)](https://github.com/ucav/mozart-router)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/ucav/mozart-router)
 
 **Mozart is the local conductor for AI agents** — a gateway-aware routing and orchestration layer that integrates as a skill, tool, adapter or middleware into your existing AI stack.
 
@@ -43,11 +44,13 @@ Detect it, understand it, orchestrate it.
 ## Quick start
 
 ```bash
-git clone https://github.com/ucav/mozart-router.git
-cd mozart-router
-npm install
-npm run build
+npm install -g mozart-router
 
+# Or use directly with npx
+npx mozart-router doctor
+```
+
+```bash
 # Integration-first — detect your existing stack
 npx mozart-router init --gateway opencode
 npx mozart-router init --gateway openclaw
@@ -74,8 +77,6 @@ npx mozart-router report
 # List available Mozart skills for your agents
 npx mozart-router skills
 ```
-
-> Note: until published to npm, use `npm run mozart -- <command>` for local development. The `npx mozart-router` commands will work after `npm publish`.
 
 ## Integration modes
 
@@ -131,7 +132,7 @@ const models = await ollama.listModels();
 ### 4. Middleware mode — OpenAI-compatible proxy
 
 ```bash
-npm run mozart -- proxy --port=4445
+npx mozart-router proxy --port=4445
 # Point your agent to http://127.0.0.1:4445/v1
 # Mozart routes every chat completion to the best model
 ```
@@ -243,7 +244,9 @@ Mozart exposes these skills for agents:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+Contributions are welcome! Check the [good first issues](https://github.com/ucav/mozart-router/labels/good%20first%20issue) for beginner-friendly tasks.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full contribution guidelines.
 
 ## License
 

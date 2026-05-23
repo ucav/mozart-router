@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/ucav/mozart-router/tree/master/docs
+    about: Browse the full Mozart documentation
+  - name: npm package
+    url: https://www.npmjs.com/package/mozart-router
+    about: Mozart on npm
