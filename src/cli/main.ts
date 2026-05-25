@@ -205,9 +205,34 @@ async function listSkills() {
 async function init(gateway: string) {
   if (!gateway) { console.log('Please specify a gateway: opencode, openclaw, hermes, litellm'); return; }
   const gw = gateway.replace('--gateway=', '').replace('--gateway', '');
-  console.log(`Initializing Mozart for ${gw || 'unknown'}...`);
-  console.log('\nIntegration files available in examples/ directory.');
-  console.log('See docs/INTEGRATIONS.md for full instructions.\n');
+  if (!gw || gw === '--gateway') { console.log('Please specify a gateway name'); return; }
+  console.log(`Initializing Mozart for ${gw}...`);
+  console.log(`\nIntegration manifest: examples/${gw}/`);
+  console.log('1. Copy the manifest to your agent config directory');
+  console.log('2. Install Mozart: npm install mozart-router');
+  console.log('3. Import SDK: import { Mozart } from \'mozart-router\'');
+
+  switch (gw) {
+    case 'opencode':
+      console.log('\nOpenCode: Place .opencode/skills/mozart/SKILL.md in your project');
+      console.log('  See: examples/opencode/SKILL.md');
+      break;
+    case 'openclaw':
+      console.log('\nOpenClaw: Add mozart skills to your openclaw.json config');
+      console.log('  See: examples/openclaw/mozart-skill.yaml');
+      break;
+    case 'hermes':
+      console.log('\nHermes: Add mozart tools to your agent configuration');
+      console.log('  See: examples/hermes/mozart-tool.json');
+      break;
+    case 'litellm':
+      console.log('\nLiteLLM: Mozart auto-detects your litellm_config.yaml');
+      console.log('  No manual setup needed. Run `mozart doctor`.');
+      break;
+    default:
+      console.log(`\nGeneric integration: See examples/generic-tools/mozart-tools.json`);
+  }
+
   generateDefaultConfigFile();
 }
 
@@ -271,7 +296,7 @@ async function syncDealsforge(mozart: Mozart) {
   console.log('\nDealsForge sync complete. Run `mozart inventory` to see updated data.');
 }
 
-async function scanLocal(mozart: Mozart) {
+async function scanLocal(_mozart: Mozart) {
   console.log('Scanning local capabilities...\n');
   const capability = scanLocalCapability();
   console.log(`OS: ${capability.os} (${capability.platform}, ${capability.arch})`);
@@ -450,6 +475,9 @@ async function configCommand(args: string[]) {
     await interactiveConfigInit();
   } else {
     console.log('Usage: mozart config init');
+    console.log('\nManage Mozart configuration.');
+    console.log('  init    Run interactive setup wizard');
+    console.log('\nOr edit ~/.mozart/config.yaml directly.');
   }
 }
 

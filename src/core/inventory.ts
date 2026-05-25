@@ -94,7 +94,17 @@ export class InventoryRegistry {
   // ── Merge ──────────────────────────────────────────────
   mergeFromAdapter(adapterId: string, providers: Provider[], models: Model[]): void {
     for (const p of providers) {
-      this.addProvider({ ...p, gateway: adapterId, source: p.source || 'detected' });
+      const existing = this.providers.get(p.id);
+      if (existing) {
+        this.providers.set(p.id, {
+          ...existing,
+          ...p,
+          gateway: existing.gateway ? `${existing.gateway},${adapterId}` : (p.gateway || adapterId),
+          source: p.source || existing.source,
+        });
+      } else {
+        this.providers.set(p.id, { ...p, gateway: p.gateway || adapterId, source: p.source || 'detected' });
+      }
     }
     for (const m of models) {
       this.addModel({ ...m, gatewayId: adapterId });
@@ -103,12 +113,14 @@ export class InventoryRegistry {
 
   // ── Snapshots ──────────────────────────────────────────
   snapshot(): InventorySnapshot {
+    const sources = new Set(this.listProviders().map((p) => p.source));
+    const sourceStr = sources.has('manual') ? 'hybrid' : sources.has('dealsforge') ? 'hybrid' : 'auto';
     return {
       gateways: this.listDetections(),
       providers: this.listProviders(),
       models: this.listModels(),
       generatedAt: new Date().toISOString(),
-      source: 'auto',
+      source: sourceStr as 'auto' | 'manual' | 'hybrid',
     };
   }
 

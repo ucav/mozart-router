@@ -104,7 +104,7 @@ describe('InventoryRegistry', () => {
     const snapshot = registry.snapshot();
     expect(snapshot.providers).toHaveLength(1);
     expect(snapshot.models).toHaveLength(1);
-    expect(snapshot.source).toBe('auto');
+    expect(snapshot.source).toBe('hybrid');
     expect(snapshot.generatedAt).toBeDefined();
   });
 
