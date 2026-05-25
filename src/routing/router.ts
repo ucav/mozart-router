@@ -136,6 +136,7 @@ export class RoutingEngine {
     tokens.total = tokens.input + tokens.output;
 
     return {
+      selectedGateway: undefined,
       selectedProvider: 'none',
       selectedModel: 'none',
       score: 0,

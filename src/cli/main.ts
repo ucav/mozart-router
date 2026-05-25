@@ -137,7 +137,7 @@ async function doctor(mozart: Mozart) {
 
   const finalSnapshot = mozart.getInventory();
 
-  saveInventory(snapshot);
+  saveInventory(finalSnapshot);
   console.log(`\nInventory saved to ${getMozartDir()}/inventory.json`);
 }
 

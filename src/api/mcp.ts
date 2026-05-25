@@ -106,12 +106,13 @@ export class MozartMcpServer {
 
   async handleRequest(request: McpRequest): Promise<McpResponse> {
     const { id, method, params } = request;
+    const safeId = id ?? 0;
 
     try {
       switch (method) {
         case 'initialize':
           return {
-            jsonrpc: '2.0', id,
+            jsonrpc: '2.0', id: safeId,
             result: {
               protocolVersion: '2024-11-05',
               serverInfo: { name: 'mozart-router', version: '0.1.0' },
@@ -119,9 +120,12 @@ export class MozartMcpServer {
             },
           };
 
+        case 'notifications/initialized':
+          return { jsonrpc: '2.0', id: safeId, result: {} };
+
         case 'tools/list':
           return {
-            jsonrpc: '2.0', id,
+            jsonrpc: '2.0', id: safeId,
             result: { tools: this.getTools() },
           };
 
@@ -129,11 +133,17 @@ export class MozartMcpServer {
           const toolName = params?.name as string;
           const toolArgs = (params?.arguments ?? {}) as Record<string, unknown>;
 
+          if (!toolName) {
+            return { jsonrpc: '2.0', id: safeId, error: { code: -32602, message: 'Missing tool name' } };
+          }
+
           let result: unknown;
 
           switch (toolName) {
             case 'mozart_route_model': {
-              const route = await this.mozart.recommend(toolArgs.task as string);
+              const task = toolArgs.task as string;
+              if (!task) return { jsonrpc: '2.0', id: safeId, error: { code: -32602, message: 'Missing required parameter: task' } };
+              const route = await this.mozart.recommend(task);
               result = {
                 content: [{
                   type: 'text',
@@ -152,7 +162,9 @@ export class MozartMcpServer {
             }
 
             case 'mozart_estimate_cost': {
-              const route = await this.mozart.simulate(toolArgs.task as string);
+              const task = toolArgs.task as string;
+              if (!task) return { jsonrpc: '2.0', id: safeId, error: { code: -32602, message: 'Missing required parameter: task' } };
+              const route = await this.mozart.route(task);
               result = {
                 content: [{
                   type: 'text',
@@ -167,7 +179,9 @@ export class MozartMcpServer {
             }
 
             case 'mozart_privacy_check': {
-              const check = this.mozart.privacyGuard.evaluate(toolArgs.content as string);
+              const content = toolArgs.content as string;
+              if (!content) return { jsonrpc: '2.0', id: safeId, error: { code: -32602, message: 'Missing required parameter: content' } };
+              const check = this.mozart.privacyGuard.evaluate(content);
               result = {
                 content: [{
                   type: 'text',
@@ -200,6 +214,8 @@ export class MozartMcpServer {
             }
 
             case 'mozart_compress_context': {
+              const content = toolArgs.content as string;
+              if (!content) return { jsonrpc: '2.0', id: safeId, error: { code: -32602, message: 'Missing required parameter: content' } };
               const strategy = this.mozart.contextOptimizer.optimize(
                 toolArgs.content as string,
                 [],
@@ -235,23 +251,24 @@ export class MozartMcpServer {
 
             default:
               return {
-                jsonrpc: '2.0', id,
+                jsonrpc: '2.0', id: safeId,
                 error: { code: -32601, message: `Unknown tool: ${toolName}` },
               };
           }
 
-          return { jsonrpc: '2.0', id, result };
+          return { jsonrpc: '2.0', id: safeId, result };
+
         }
 
         default:
           return {
-            jsonrpc: '2.0', id,
+            jsonrpc: '2.0', id: safeId,
             error: { code: -32601, message: `Unknown method: ${method}` },
           };
       }
     } catch (err) {
       return {
-        jsonrpc: '2.0', id,
+        jsonrpc: '2.0', id: safeId,
         error: { code: -32000, message: String(err) },
       };
     }

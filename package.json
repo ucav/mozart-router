@@ -1,6 +1,6 @@
 {
   "name": "mozart-router",
-  "version": "0.1.2",
+  "version": "0.1.5",
   "description": "Mozart: local conductor for AI agents — gateway-first orchestration and routing layer.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

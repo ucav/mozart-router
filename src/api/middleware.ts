@@ -52,9 +52,16 @@ export class MozartMiddleware {
 
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    const contentLength = parseInt(req.headers['content-length'] ?? '0', 10);
+    if (contentLength > 10 * 1024 * 1024) {
+      res.writeHead(413);
+      res.end(JSON.stringify({ error: 'Request body too large' }));
+      return;
+    }
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -99,8 +106,22 @@ export class MozartMiddleware {
     // Let Mozart route the task
     const route = await this.mozart.route(userMessage);
 
-    if (route.selectedModel === 'none') {
-      // Fallback: forward to upstream gateway
+      if (route.selectedModel === 'none') {
+      // Try upstream fallback
+      try {
+        const upstreamResponse = await fetch(`${this.upstreamUrl}/v1/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: requestedModel ?? 'gpt-4o', messages }),
+          signal: AbortSignal.timeout(30000),
+        });
+        if (upstreamResponse.ok) {
+          const upstreamData = await upstreamResponse.json();
+          res.writeHead(200);
+          res.end(JSON.stringify(upstreamData));
+          return;
+        }
+      } catch { /* upstream unavailable, fall through to recommendation */ }
       res.writeHead(200);
       res.end(JSON.stringify({
         id: 'mozart-fallback',
@@ -142,50 +163,19 @@ export class MozartMiddleware {
       if (result.success && result.output) {
         res.writeHead(200);
         res.end(JSON.stringify({
-          id: `mozart-${Date.now()}`,
-          object: 'chat.completion',
-          model: route.selectedModel,
-          choices: [{
-            index: 0,
-            message: { role: 'assistant', content: result.output },
-            finish_reason: 'stop',
-          }],
-          usage: {
-            prompt_tokens: route.estimatedTokens.input,
-            completion_tokens: route.estimatedTokens.output,
-            total_tokens: route.estimatedTokens.total,
-          },
-          mozart_route: {
-            provider: route.selectedProvider,
-            model: route.selectedModel,
-            confidence: route.confidence,
-            estimated_cost: route.estimatedCost,
-            explanation: route.explanation,
-          },
-        }));
-        return;
-      }
-
-      res.writeHead(200);
-      res.end(JSON.stringify({
         id: `mozart-${Date.now()}`,
         object: 'chat.completion',
         model: route.selectedModel,
         choices: [{
           index: 0,
-          message: {
-            role: 'assistant',
-            content: `[Mozart Route] Recommended: ${route.selectedProvider}/${route.selectedModel}\nExecution failed: ${result.error}\nRun via your gateway directly.`,
-          },
+          message: { role: 'assistant', content: result.output },
           finish_reason: 'stop',
         }],
         mozart_route: route,
       }));
       return;
     }
-
-    // Recommend-only: return the recommendation
-    res.writeHead(200);
+    res.writeHead(502);
     res.end(JSON.stringify({
       id: `mozart-${Date.now()}`,
       object: 'chat.completion',
@@ -194,27 +184,47 @@ export class MozartMiddleware {
         index: 0,
         message: {
           role: 'assistant',
-          content: `[Mozart Recommendation]\nUse: ${route.selectedGateway ?? 'direct'} / ${route.selectedProvider} / ${route.selectedModel}\nCost: $${route.estimatedCost.toFixed(4)}\nConfidence: ${Math.round(route.confidence * 100)}%\n\n${route.explanation.join('\n')}`,
+          content: `[Mozart Route] Recommended: ${route.selectedProvider}/${route.selectedModel}\nExecution failed: ${result.error}\nRun via your gateway directly.`,
         },
         finish_reason: 'stop',
       }],
-      usage: {
-        prompt_tokens: route.estimatedTokens.input,
-        completion_tokens: route.estimatedTokens.output,
-        total_tokens: route.estimatedTokens.total,
-      },
       mozart_route: route,
     }));
+    return;
+  }
+
+  // No adapter: recommend-only (fallthrough)
+  res.writeHead(200);
+  res.end(JSON.stringify({
+    id: `mozart-${Date.now()}`,
+    object: 'chat.completion',
+    model: route.selectedModel,
+    choices: [{
+      index: 0,
+      message: {
+        role: 'assistant',
+        content: `[Mozart Recommendation]\nUse: ${route.selectedGateway ?? 'direct'} / ${route.selectedProvider} / ${route.selectedModel}\nCost: $${route.estimatedCost.toFixed(4)}\nConfidence: ${Math.round(route.confidence * 100)}%\n\n${route.explanation.join('\n')}`,
+      },
+      finish_reason: 'stop',
+    }],
+    usage: {
+      prompt_tokens: route.estimatedTokens.input,
+      completion_tokens: route.estimatedTokens.output,
+      total_tokens: route.estimatedTokens.total,
+    },
+    mozart_route: route,
+  }));
   }
 
   private readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let data = '';
       req.on('data', (chunk) => { data += chunk; });
       req.on('end', () => {
         try { resolve(data ? JSON.parse(data) : {}); }
         catch { resolve({}); }
       });
+      req.on('error', reject);
     });
   }
 }

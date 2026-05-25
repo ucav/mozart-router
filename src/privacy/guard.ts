@@ -113,7 +113,7 @@ export class PrivacyGuard {
     if (highestAction !== 'allow') {
       redactedContent = content;
       for (const f of findings) {
-        redactedContent = redactedContent.replace(f.match, f.masked);
+        redactedContent = redactedContent.split(f.match).join(f.masked);
       }
     }
 

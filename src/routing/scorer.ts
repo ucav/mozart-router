@@ -96,9 +96,9 @@ export class RoutingScorer {
     // Apply policy preferences
     const weights = {
       quality: profile.costPreference === 'quality' ? 0.35 : profile.costPreference === 'balanced' ? 0.25 : 0.15,
-      cost: profile.costPreference === 'lowest' ? 0.35 : profile.costPreference === 'balanced' ? 0.25 : 0.1,
+      cost: profile.costPreference === 'lowest' || policyPreferences.cheapFirst ? 0.35 : profile.costPreference === 'balanced' ? 0.25 : 0.1,
       latency: profile.latencyPreference === 'fast' ? 0.2 : profile.latencyPreference === 'balanced' ? 0.1 : 0.05,
-      privacy: profile.privacyNeed === 'local_only' || profile.privacyNeed === 'high' ? 0.25 : 0.1,
+      privacy: profile.privacyNeed === 'local_only' || profile.privacyNeed === 'high' || policyPreferences.preferLocal ? 0.25 : 0.1,
       context: profile.contextNeed === 'very_high' ? 0.15 : 0.05,
       reliability: 0.05,
       quota: 0.05,

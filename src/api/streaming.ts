@@ -46,10 +46,17 @@ export class StreamingMiddleware {
   }
 
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+    const contentLength = parseInt(req.headers['content-length'] ?? '0', 10);
+    if (contentLength > 10 * 1024 * 1024) {
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Request body too large' }));
+      return;
+    }
 
     const url = req.url ?? '/';
     const method = req.method ?? 'GET';
@@ -114,7 +121,6 @@ export class StreamingMiddleware {
           choices: [{ index: 0, delta: { content: line + '\n' }, finish_reason: null }],
         };
         res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-        await this.sleep(50); // simulate streaming cadence
       }
 
       // Try delegate execution and stream result
@@ -136,41 +142,22 @@ export class StreamingMiddleware {
           });
 
           if (execResult.success && execResult.output) {
-            const words = execResult.output.split(' ');
-            for (const word of words) {
+            const lines = execResult.output.split('\n');
+            for (const line of lines) {
               const chunk = {
                 id: `mozart-${Date.now()}`,
                 object: 'chat.completion.chunk',
                 model: route.selectedModel,
-                choices: [{ index: 0, delta: { content: word + ' ' }, finish_reason: null }],
+                choices: [{ index: 0, delta: { content: line + '\n' }, finish_reason: null }],
               };
               res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-              await this.sleep(20);
             }
           }
         } catch {
           // execution failed, already sent recommendation
         }
       } else {
-        // Recommend-only: send the recommendation
-        const recLines = [
-          `[Mozart Recommendation]`,
-          `Use: ${route.selectedGateway ?? 'direct'} / ${route.selectedProvider} / ${route.selectedModel}`,
-          `Cost: $${route.estimatedCost.toFixed(4)}`,
-          `Confidence: ${Math.round(route.confidence * 100)}%`,
-          ``,
-          ...route.explanation,
-        ];
-        for (const line of recLines) {
-          const chunk = {
-            id: `mozart-${Date.now()}`,
-            object: 'chat.completion.chunk',
-            model: route.selectedModel,
-            choices: [{ index: 0, delta: { content: line + '\n' }, finish_reason: null }],
-          };
-          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-          await this.sleep(30);
-        }
+        // Recommend-only: already sent explanation above, skip duplicate
       }
 
       // Final chunk
@@ -234,17 +221,14 @@ export class StreamingMiddleware {
   }
 
   private readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let data = '';
       req.on('data', (c) => { data += c; });
       req.on('end', () => {
         try { resolve(data ? JSON.parse(data) : {}); }
         catch { resolve({}); }
       });
+      req.on('error', reject);
     });
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
   }
 }

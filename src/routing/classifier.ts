@@ -31,9 +31,11 @@ export class TaskClassifier {
 
     for (const { pattern, taskType, complexity, contextNeed, priority } of TASK_PATTERNS) {
       const matchResult = combined.match(pattern);
-      const matches = matchResult ? matchResult.length : 0;
-      if (matches === 0) continue;
-      const score = matches * priority;
+      if (!matchResult) continue;
+      // Count matches: use full match only, not capture groups.
+      // RegExp without /g returns [full, ...captures], so length > 1 = captures.
+      // We score by: whether it matched (1) × priority.
+      const score = priority;
       if (score > bestScore) {
         bestScore = score;
         bestMatch = { taskType, complexity, contextNeed };

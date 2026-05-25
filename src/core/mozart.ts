@@ -166,30 +166,73 @@ export class Mozart {
     if (this.registry.hasAdapter(route.selectedGateway)) {
       const adapter = this.registry.getAdapter(route.selectedGateway!);
       if (adapter?.execute) {
-        const target = adapter.getExecutionTarget
-          ? await adapter.getExecutionTarget(route)
-          : undefined;
-        const execReq = {
-          input: request.input,
-          context: request.context,
-          model: route.selectedModel,
-          provider: route.selectedProvider,
-          gateway: route.selectedGateway,
-          executionTarget: target ?? {
-            adapter: adapter.id,
-            provider: route.selectedProvider,
+        try {
+          const target = adapter.getExecutionTarget
+            ? await adapter.getExecutionTarget(route)
+            : undefined;
+          const execReq = {
+            input: request.input,
+            context: request.context,
             model: route.selectedModel,
-            apiKeyManagedBy: 'gateway',
-            method: 'gateway_call',
-          },
-        };
-        const result = await adapter.execute(execReq);
-        this.logger.logEvent('execution', `Result from ${route.selectedModel}: success=${result.success}`);
-        return result.output ?? `[Execution delegated to ${route.selectedGateway}]}`;
+            provider: route.selectedProvider,
+            gateway: route.selectedGateway,
+            executionTarget: target ?? {
+              adapter: adapter.id,
+              provider: route.selectedProvider,
+              model: route.selectedModel,
+              apiKeyManagedBy: 'gateway',
+              method: 'gateway_call',
+            },
+          };
+          const result = await adapter.execute(execReq);
+          this.logger.logEvent('execution', `Result from ${route.selectedModel}: success=${result.success}`);
+          if (!result.success) {
+            this.logger.warn('execution', `Execution failed: ${result.error}. Falling back.`);
+            return await this.tryFallback(route, execReq);
+          }
+          return result.output ?? `[Execution delegated to ${route.selectedGateway}]`;
+        } catch (err) {
+          this.logger.error('execution', `Adapter threw: ${err}`);
+          return await this.tryFallback(route, {
+            input: request.input,
+            context: request.context,
+            model: route.selectedModel,
+            provider: route.selectedProvider,
+            gateway: route.selectedGateway,
+            executionTarget: {
+              adapter: adapter.id,
+              provider: route.selectedProvider,
+              model: route.selectedModel,
+              apiKeyManagedBy: 'gateway',
+              method: 'gateway_call',
+            },
+          });
+        }
       }
     }
 
     return `[Recommendation only] Route: ${route.selectedGateway ?? 'direct'} / ${route.selectedProvider} / ${route.selectedModel}`;
+  }
+
+  private async tryFallback(route: RouteDecision, execReq: { input: string; context?: string[]; model: string; provider: string; gateway?: string; executionTarget: import('../types').ExecutionTarget }): Promise<string> {
+    for (const fb of route.fallbacks.slice(0, 2)) {
+      const fbAdapter = this.registry.getAdapter(fb.selectedGateway);
+      if (fbAdapter?.execute) {
+        try {
+          const result = await fbAdapter.execute({
+            ...execReq,
+            model: fb.selectedModel,
+            provider: fb.selectedProvider,
+            gateway: fb.selectedGateway,
+          });
+          if (result.success && result.output) {
+            this.logger.logEvent('fallback', `Fallback succeeded: ${fb.selectedModel}`);
+            return result.output;
+          }
+        } catch { /* try next */ }
+      }
+    }
+    return `[All routes exhausted] ${route.selectedModel} and ${route.fallbacks.length} fallbacks failed.`;
   }
 
   async detectAll(): Promise<number> {

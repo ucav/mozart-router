@@ -58,14 +58,21 @@ export class MozartApiServer {
   }
 
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
       res.end();
+      return;
+    }
+
+    // Body size limit: 10MB
+    const contentLength = parseInt(req.headers['content-length'] ?? '0', 10);
+    if (contentLength > 10 * 1024 * 1024) {
+      res.writeHead(413, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Request body too large (max 10MB)' }));
       return;
     }
 
@@ -288,7 +295,7 @@ async function readBody(req: http.IncomingMessage): Promise<Record<string, unkno
       try {
         resolve(data ? JSON.parse(data) : {});
       } catch {
-        resolve({});
+        resolve({ _parseError: true });
       }
     });
     req.on('error', reject);

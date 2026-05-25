@@ -10,8 +10,7 @@ export class ContextOptimizer {
     const estimatedTokens = this.estimateTokens(totalInput);
 
     // Model-agnostic context limits
-    let maxTokens = 200000; // generous default for unknown models
-
+    let maxTokens = 32000;
     if (profile.contextNeed === 'very_high') {
       maxTokens = 200000;
     } else if (profile.contextNeed === 'high') {
@@ -47,11 +46,13 @@ export class ContextOptimizer {
     }
 
     if (profile.taskType === 'summarize' || profile.taskType === 'chat') {
+      const compressedTokens = Math.min(estimatedTokens, maxTokens);
+      const ratio = estimatedTokens > 0 ? compressedTokens / estimatedTokens : 1;
       return {
         action: 'compress',
-        estimatedInputTokens: Math.min(estimatedTokens, maxTokens),
+        estimatedInputTokens: compressedTokens,
         maxTokens,
-        compressionRatio: 0.7,
+        compressionRatio: Math.round(ratio * 100) / 100,
         instructions: [
           `Compressing context: ${estimatedTokens} tokens → ~${Math.floor(estimatedTokens * 0.7)} tokens.`,
           'Remove redundant content.',
