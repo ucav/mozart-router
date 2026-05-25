@@ -77,7 +77,7 @@ export class RoutingEngine {
       selectedProvider: s.providerId,
       selectedModel: s.modelId,
       score: s.totalScore,
-      confidence: s.totalScore * 0.8,
+      confidence: Math.round(s.totalScore * 0.8 * 1000) / 1000,
       contextStrategy: contextStrategy.action,
       estimatedCost: this.costEstimator.estimateCostForModel(
         this.registry.getModel(s.providerId, s.modelId) ?? null,
@@ -113,7 +113,7 @@ export class RoutingEngine {
       selectedProvider: top.providerId,
       selectedModel: top.modelId,
       score: top.totalScore,
-      confidence: top.totalScore * 0.9,
+      confidence: Math.round(top.totalScore * 0.9 * 1000) / 1000,
       contextStrategy: contextStrategy.action,
       estimatedCost,
       estimatedTokens,

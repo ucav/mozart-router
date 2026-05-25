@@ -20,6 +20,7 @@ import { ContextOptimizer } from '../context/optimizer';
 import { AdvancedContextOptimizer } from '../context/advanced-optimizer';
 import { CostEstimator } from '../cost/estimator';
 import { ExplainabilityEngine } from '../explain/engine';
+import { FallbackManager } from '../routing/fallback';
 import { Logger } from '../logs/logger';
 
 export interface MozartConfig {
@@ -40,6 +41,7 @@ export class Mozart {
   public explainer: ExplainabilityEngine;
   public logger: Logger;
   public session: SessionTracker;
+  public fallbackManager: FallbackManager;
 
   constructor(config?: MozartConfig) {
     this.registry = config?.registry ?? new InventoryRegistry();
@@ -58,6 +60,7 @@ export class Mozart {
     );
     this.explainer = new ExplainabilityEngine();
     this.session = new SessionTracker();
+    this.fallbackManager = new FallbackManager();
   }
 
   async process(request: MozartRequest): Promise<MozartResponse> {
@@ -71,7 +74,15 @@ export class Mozart {
     const privacyResult = this.privacyGuard.evaluate(request.input);
     if (request.context?.length) {
       for (const ctx of request.context) {
-        this.privacyGuard.evaluate(ctx);
+        const ctxPrivacy = this.privacyGuard.evaluate(ctx);
+        // Merge findings from context into main privacy result
+        if (ctxPrivacy.findings.length > 0) {
+          privacyResult.findings.push(...ctxPrivacy.findings);
+          if (ctxPrivacy.action === 'local_only' || ctxPrivacy.action === 'block_cloud') {
+            privacyResult.action = ctxPrivacy.action;
+            privacyResult.allowed = false;
+          }
+        }
       }
     }
 
@@ -215,24 +226,38 @@ export class Mozart {
   }
 
   private async tryFallback(route: RouteDecision, execReq: { input: string; context?: string[]; model: string; provider: string; gateway?: string; executionTarget: import('../types').ExecutionTarget }): Promise<string> {
-    for (const fb of route.fallbacks.slice(0, 2)) {
-      const fbAdapter = this.registry.getAdapter(fb.selectedGateway);
-      if (fbAdapter?.execute) {
-        try {
-          const result = await fbAdapter.execute({
-            ...execReq,
-            model: fb.selectedModel,
-            provider: fb.selectedProvider,
-            gateway: fb.selectedGateway,
-          });
-          if (result.success && result.output) {
-            this.logger.logEvent('fallback', `Fallback succeeded: ${fb.selectedModel}`);
-            return result.output;
+    return new Promise(async (resolve) => {
+      const result = await this.fallbackManager.execute(
+        route,
+        route.fallbacks,
+        async (r) => {
+          const fbAdapter = this.registry.getAdapter(r.selectedGateway);
+          if (fbAdapter?.execute) {
+            try {
+              const fbResult = await fbAdapter.execute({
+                ...execReq,
+                model: r.selectedModel,
+                provider: r.selectedProvider,
+                gateway: r.selectedGateway,
+              });
+              if (fbResult.success && fbResult.output) {
+                this.logger.logEvent('fallback', `Fallback succeeded: ${r.selectedModel}`);
+                return { success: true };
+              }
+              return { success: false, event: 'server_error' as const };
+            } catch {
+              return { success: false, event: 'provider_unavailable' as const };
+            }
           }
-        } catch { /* try next */ }
+          return { success: false, event: 'provider_unavailable' as const };
+        },
+      );
+      if (result.success) {
+        resolve(`[Fallback succeeded after ${result.attempt} attempt(s)]`);
+      } else {
+        resolve(`[All routes exhausted] ${route.selectedModel} and ${route.fallbacks.length} fallbacks failed.`);
       }
-    }
-    return `[All routes exhausted] ${route.selectedModel} and ${route.fallbacks.length} fallbacks failed.`;
+    });
   }
 
   async detectAll(): Promise<number> {
